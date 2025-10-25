@@ -1,0 +1,29 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+
+# Cache, backup, and data files
+*.cache
+*.bak
+*.pth
+*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.h5
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/

@@ -1,0 +1,9 @@
+# Basic dependencies
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+jupyter
+python-dotenv
+
