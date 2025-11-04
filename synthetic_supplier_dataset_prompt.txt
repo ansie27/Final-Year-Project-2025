@@ -1,0 +1,8 @@
+Synthetic Supplier Dataset
+---------------------------
+Please generate a supplier dataset according to these rules and constraints:
+1. refer to the documentation uploaded
+2. generate a dataset with the maximum amount of rows you are able to generate for the attributes stated in the documentation
+3. do not generate attributes that need to be feature engineered, but let me know which attributes they are
+4. do comply to realism standards, add noise, inconsistencies, and other problems that can allow me to show data preprocessing technical skills like data cleaning and data transformation, etc.
+5. generate into a .csv file
