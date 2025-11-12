@@ -1,8 +1,64 @@
 Synthetic Supplier Dataset
 ---------------------------
+Version 1:
 Please generate a supplier dataset according to these rules and constraints:
 1. refer to the documentation uploaded
 2. generate a dataset with the maximum amount of rows you are able to generate for the attributes stated in the documentation
 3. do not generate attributes that need to be feature engineered, but let me know which attributes they are
 4. do comply to realism standards, add noise, inconsistencies, and other problems that can allow me to show data preprocessing technical skills like data cleaning and data transformation, etc.
 5. generate into a .csv file
+
+Version 2:
+Generate a supplier dataset according to these rules and constraints:
+1. Generate a dataset with 5000 rows of these attributes by following these criteria of attribute name, data type, description, example value:
+- Supplier_ID, String, unique supplier identifier, SUP001
+- Supplier_Name, String, supplier name, Amazon Web Services (AWS)
+- Country, Categorical, supplier country of operation, Japan
+- Region, Categorical, regional classification for risk mapping, Asia-Pacific
+- Supplier_Tier, Integer, tier level in the supply chain, 2
+- Industry_Sector, Categorical, industry classification NAICS code, 331110 
+- ESG_Score, Float, combined environmental, social and governance performance score, 82.5
+- Environmental_Score, Float, component score focusing on environmental impact, 78.2
+- Social_Score, Float, component score for labour practices safety, and equity, 85.0
+- Governance_Score, Float, component score for transparency, audit, and compliance, 84.3
+- Carbon_Emission_Intensity, Float, metric tons CO2e per production unit (normalised), 2.45
+- Waste_Management_Efficiency, Float, proportion of waste recycled or reused, 0.78
+- Renewable_Energy_Usage, Float, Fraction of total energy from renewable sources, 0.62
+- Compliance_Level, Ordinal, 0=None, 1=Partial, 2=Compliant, 3=Certified, 3
+- Sustainability_Report_Availability, Binary, whether supplier publishes a sustainability report, 1
+- Lead_Time_Days, Integer, average lead time in days, 25 
+- Production_Capacity, Integer, units or metric tons per month, 12000 
+- On_Time_Delivery_Rate, Float, percentage of orders delivered on time, 0.94
+- Defect_Rate, Float, percentage of defective or returned items, 0.03
+- Financial_Stability_Score, Float, creditworthiness or liquidity score, 87.0
+- Cost_Index, Float, relative cost compared to industry average, 0.65
+- Labour_Compliance_Score, Float, compliance with labour and safety standards, 91.2
+- Diversity_Index, Float, measure of diversity and inclusion in workforce, 0.54
+- Supplier_Audit_Score, Float, external audit or certification score, 88.5
+- Incident_History_Count, Integer, number of recorded environmental/social violations, 2
+- Logistics_Distance_km, Integer, distance between supplier and buyer, 3200
+
+2. Supplier Name has to be a real supplier name that exists in real-world industries
+3. Comply to realism standards, add noise, inconsistencies, and other problems that real-world raw datasets will have and will need to be preprocessed and cleaned
+4. Output will be a .csv file named "synthetic_supplier_dataset_1.csv"
+
+ChatGPT (GPT-5) response:
+Summary of dataset characteristics:
+- Rows: ~5050 (including 1% intentional duplicates)
+- Columns: 26 attributes
+- Realism: 
+  - Contains real-world supplier names
+  - Introduced missing values, outliers, and format inconsistencies
+- Use case: Ideal for demonstrating data cleaning, integration, and feature engineering in your FYP workflow.
+
+
+
+
+
+
+
+
+
+
+
+
