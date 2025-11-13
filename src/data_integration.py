@@ -9,9 +9,9 @@ import numpy as np
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
-def integrate_datasets(supplier_data, commodity_data, co2_data):
+def integrate_datasets(supplier_data, commodity_data, co2_data, esg_industry=None):
     """
-    Integrates supplier, commodity (GHG), and CO2 datasets.
+    Integrates supplier, commodity (GHG), CO2, and ESG datasets.
     
     Parameters:
     -----------
@@ -21,11 +21,13 @@ def integrate_datasets(supplier_data, commodity_data, co2_data):
         GHG emission factors dataset
     co2_data : pd.DataFrame
         Country-level CO2 emissions data
+    esg_industry : pd.DataFrame, optional
+        ESG metrics aggregated by industry
         
     Returns:
     --------
     pd.DataFrame
-        Integrated dataset with all three sources merged
+        Integrated dataset with all sources merged
     """
     
     print("="*70)
@@ -35,7 +37,7 @@ def integrate_datasets(supplier_data, commodity_data, co2_data):
     # =====================================================================
     # STEP 1: AGGREGATE GHG FACTORS BY INDUSTRY & GHG TYPE
     # =====================================================================
-    print("\n[1/3] Aggregating GHG emission factors by industry...")
+    print("\n[1/4] Aggregating GHG emission factors by industry...")
     
     # For each industry and GHG type, get the supply chain emission factor with margins
     ghg_factors = commodity_data.groupby(['Industry_Sector', 'GHG']).agg({
@@ -61,7 +63,7 @@ def integrate_datasets(supplier_data, commodity_data, co2_data):
     # =====================================================================
     # STEP 2: MERGE SUPPLIER DATA WITH GHG FACTORS
     # =====================================================================
-    print("\n[2/3] Merging supplier data with GHG emission factors...")
+    print("\n[2/4] Merging supplier data with GHG emission factors...")
     
     supplier_ghg = pd.merge(
         supplier_data,
@@ -73,9 +75,28 @@ def integrate_datasets(supplier_data, commodity_data, co2_data):
     print(f"   ✓ Merged {len(supplier_ghg)} supplier records with GHG factors")
     
     # =====================================================================
-    # STEP 3: MERGE WITH COUNTRY-LEVEL CO2 DATA (LATEST YEAR)
+    # STEP 3: MERGE WITH ESG DATA (if provided)
     # =====================================================================
-    print("\n[3/3] Merging with country-level CO2 data...")
+    if esg_industry is not None:
+        print("\n[3/4] Merging with S&P 500 ESG metrics by industry...")
+        
+        supplier_ghg_esg = pd.merge(
+            supplier_ghg,
+            esg_industry,
+            on='Industry_Sector',
+            how='left'
+        )
+        
+        print(f"   ✓ Merged ESG metrics for {esg_industry['Industry_Sector'].nunique()} industries")
+        supplier_ghg = supplier_ghg_esg
+        step_number = 4
+    else:
+        step_number = 3
+    
+    # =====================================================================
+    # STEP 4(3): MERGE WITH COUNTRY-LEVEL CO2 DATA (LATEST YEAR)
+    # =====================================================================
+    print(f"\n[{step_number}/4] Merging with country-level CO2 data...")
     
     # Get the most recent year's CO2 data for each country
     co2_latest = co2_data.sort_values('year').drop_duplicates(
@@ -174,9 +195,10 @@ if __name__ == "__main__":
     supplier_data = pd.read_csv("data/raw/synthetic_supplier_dataset_1.csv")
     commodity_data = pd.read_csv("data/raw/SupplyChainGHGEmissionFactors_v1.2_NAICS_byGHG_USD2021.csv")
     co2_data = pd.read_csv("data/raw/owid-co2-data.csv")
+    esg_industry = pd.read_csv("data/processed/preprocessed_esg_by_industry.csv")
     
     # Integrate datasets
-    integrated_data = integrate_datasets(supplier_data, commodity_data, co2_data)
+    integrated_data = integrate_datasets(supplier_data, commodity_data, co2_data, esg_industry)
     
     # Save integrated dataset
     print("\nSaving integrated dataset...")
