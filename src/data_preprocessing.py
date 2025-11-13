@@ -170,6 +170,117 @@ def preprocess_commodity_data(commodity_data):
     return commodity_data
 
 
+def preprocess_esg_data(esg_data):
+    """
+    Clean and standardize S&P 500 ESG dataset.
+    
+    Parameters:
+    -----------
+    esg_data : pd.DataFrame
+        Raw ESG dataset from S&P 500
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Cleaned and aggregated ESG dataset
+    """
+    
+    print("\n" + "="*70)
+    print("S&P 500 ESG DATA PREPROCESSING")
+    print("="*70)
+    
+    esg_data = esg_data.copy()
+    
+    print(f"\nInitial dataset shape: {esg_data.shape}")
+    
+    # Rename columns for consistency
+    print("\n[1] Standardizing column names...")
+    esg_data.rename(columns={
+        'Industry': 'Industry_Sector',
+        'Sector': 'Sector_Classification'
+    }, inplace=True)
+    print(f"   ✓ Column names standardized")
+    
+    # Handle missing values
+    print("\n[2] Handling missing values...")
+    
+    # Remove records with missing key ESG metrics
+    esg_data = esg_data.dropna(subset=['Total ESG Risk score'])
+    print(f"   ✓ Removed records with missing ESG Risk Score: {esg_data.shape[0]} records remaining")
+    
+    # Fill missing individual scores with total score average if available
+    score_cols = ['Environment Risk Score', 'Governance Risk Score', 'Social Risk Score']
+    for col in score_cols:
+        if col in esg_data.columns:
+            missing_count = esg_data[col].isnull().sum()
+            if missing_count > 0:
+                # Fill with ESG component average
+                median_val = esg_data[col].median()
+                esg_data[col].fillna(median_val, inplace=True)
+                print(f"   ✓ Filled {col}: {missing_count} records")
+    
+    # Handle controversy scores
+    if 'Controversy Score' in esg_data.columns:
+        esg_data['Controversy Score'].fillna(0, inplace=True)
+    
+    print("\n[3] Standardizing Industry_Sector names...")
+    # Standardize industry names
+    esg_data['Industry_Sector'] = esg_data['Industry_Sector'].str.strip().str.title()
+    print(f"   ✓ Standardized to {esg_data['Industry_Sector'].nunique()} unique industries")
+    
+    print("\n[4] Validating numeric ranges...")
+    # Ensure scores are positive
+    numeric_cols = ['Total ESG Risk score', 'Environment Risk Score', 
+                    'Governance Risk Score', 'Social Risk Score', 'Controversy Score']
+    for col in numeric_cols:
+        if col in esg_data.columns:
+            esg_data[col] = esg_data[col].clip(lower=0)
+    print(f"   ✓ Validated numeric ranges")
+    
+    print(f"\nFinal dataset shape: {esg_data.shape}")
+    print("="*70)
+    
+    return esg_data
+
+
+def aggregate_esg_by_industry(esg_data):
+    """
+    Aggregate ESG metrics by industry sector.
+    
+    Parameters:
+    -----------
+    esg_data : pd.DataFrame
+        Preprocessed ESG dataset
+        
+    Returns:
+    --------
+    pd.DataFrame
+        ESG metrics aggregated by industry
+    """
+    
+    print("\nAggregating ESG metrics by Industry_Sector...")
+    
+    # Group by industry and calculate mean ESG metrics
+    esg_industry = esg_data.groupby('Industry_Sector').agg({
+        'Total ESG Risk score': ['mean', 'std', 'count'],
+        'Environment Risk Score': 'mean',
+        'Governance Risk Score': 'mean',
+        'Social Risk Score': 'mean',
+        'Controversy Score': 'mean'
+    }).reset_index()
+    
+    # Flatten column names
+    esg_industry.columns = ['Industry_Sector', 
+                            'Avg_ESG_Risk_Score', 'Std_ESG_Risk_Score', 'Company_Count',
+                            'Avg_Environment_Risk', 'Avg_Governance_Risk', 'Avg_Social_Risk',
+                            'Avg_Controversy_Score']
+    
+    print(f"   ✓ Aggregated {len(esg_industry)} industries with ESG metrics")
+    print(f"   ✓ Total companies represented: {esg_industry['Company_Count'].sum():.0f}")
+    
+    return esg_industry
+
+
 def preprocess_co2_data(co2_data):
     """
     Clean and standardize CO2 emissions dataset.
@@ -313,7 +424,7 @@ def calculate_risk_metrics(integrated_data):
     return integrated_data
 
 
-def display_preprocessing_summary(supplier_data, commodity_data, co2_data):
+def display_preprocessing_summary(supplier_data, commodity_data, co2_data, esg_industry=None):
     """
     Display summary of preprocessed datasets.
     
@@ -325,6 +436,8 @@ def display_preprocessing_summary(supplier_data, commodity_data, co2_data):
         Preprocessed commodity data
     co2_data : pd.DataFrame
         Preprocessed CO2 data
+    esg_industry : pd.DataFrame, optional
+        Aggregated ESG data by industry
     """
     
     print("\n" + "="*70)
@@ -347,6 +460,12 @@ def display_preprocessing_summary(supplier_data, commodity_data, co2_data):
     print(f"  Unique countries: {co2_data['Country'].nunique()}")
     print(f"  Year range: {co2_data['year'].min()}-{co2_data['year'].max()}")
     
+    if esg_industry is not None:
+        print(f"\nS&P 500 ESG Data (Aggregated by Industry):")
+        print(f"  Shape: {esg_industry.shape}")
+        print(f"  Industries covered: {esg_industry['Industry_Sector'].nunique()}")
+        print(f"  Total companies: {esg_industry['Company_Count'].sum():.0f}")
+    
     print("\n" + "="*70)
 
 
@@ -356,18 +475,23 @@ if __name__ == "__main__":
     supplier_data = pd.read_csv("data/raw/synthetic_supplier_dataset_1.csv")
     commodity_data = pd.read_csv("data/raw/SupplyChainGHGEmissionFactors_v1.2_NAICS_byGHG_USD2021.csv")
     co2_data = pd.read_csv("data/raw/owid-co2-data.csv")
+    esg_data = pd.read_csv("data/raw/SP 500 ESG Risk Ratings.csv")
     
     # Preprocess datasets
     supplier_data = preprocess_supplier_data(supplier_data)
     commodity_data = preprocess_commodity_data(commodity_data)
     co2_data = preprocess_co2_data(co2_data)
+    esg_data = preprocess_esg_data(esg_data)
+    esg_industry = aggregate_esg_by_industry(esg_data)
     
     # Display summary
-    display_preprocessing_summary(supplier_data, commodity_data, co2_data)
+    display_preprocessing_summary(supplier_data, commodity_data, co2_data, esg_industry)
     
     # Save preprocessed datasets
     print("\nSaving preprocessed datasets...")
     supplier_data.to_csv("data/processed/preprocessed_supplier_data.csv", index=False)
     commodity_data.to_csv("data/processed/preprocessed_commodity_data.csv", index=False)
     co2_data.to_csv("data/processed/preprocessed_co2_data.csv", index=False)
-    print("Preprocessed datasets saved to data/processed/")
+    esg_data.to_csv("data/processed/preprocessed_esg_data.csv", index=False)
+    esg_industry.to_csv("data/processed/preprocessed_esg_by_industry.csv", index=False)
+    print("✓ Preprocessed datasets saved to data/processed/")
