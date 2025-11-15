@@ -1,13 +1,12 @@
 """
-Main Pipeline Script for Green Supply Chain Risk Management
+Full Analysis Pipeline Script
 
 This script runs the complete analysis pipeline including:
 1. Data preprocessing and integration
 2. Statistical analysis
 3. Machine learning modeling
-4. Fuzzy AHP-TOPSIS-GA supplier ranking
-5. Visualization
-6. Report generation
+4. Visualization
+5. Report generation
 """
 
 import sys
@@ -51,99 +50,38 @@ from reporting import (
     generate_comprehensive_report,
     export_results_to_json
 )
-from fuzzy_ahp_topsis_ga import analyze_supplier_ranking
 import config
-
-
-def set_random_seeds(seed=config.RANDOM_SEED):
-    """Set random seeds for reproducibility across all libraries."""
-    np.random.seed(seed)
-    print(f"Random seed set to {seed} for reproducibility")
-
-
-def load_raw_datasets():
-    """Load all raw datasets from data/raw directory."""
-    print("\n" + "="*70)
-    print("LOADING RAW DATASETS")
-    print("="*70 + "\n")
-    
-    try:
-        supplier_data = pd.read_csv(config.RAW_DATA_FILES['supplier'])
-        print(f"✓ Loaded supplier data: {supplier_data.shape}")
-        
-        commodity_data = pd.read_csv(config.RAW_DATA_FILES['commodity'])
-        print(f"✓ Loaded commodity/GHG data: {commodity_data.shape}")
-        
-        co2_data = pd.read_csv(config.RAW_DATA_FILES['co2'])
-        print(f"✓ Loaded CO2 data: {co2_data.shape}")
-        
-        esg_data = pd.read_csv(config.RAW_DATA_FILES['esg'])
-        print(f"✓ Loaded S&P 500 ESG data: {esg_data.shape}")
-        
-        return supplier_data, commodity_data, co2_data, esg_data
-    
-    except FileNotFoundError as e:
-        print(f"✗ Error loading data: {e}")
-        print("Please ensure all data files are in the data/raw directory")
-        sys.exit(1)
-
-
-def save_processed_datasets(supplier_data, commodity_data, co2_data, esg_data, esg_industry):
-    """Save preprocessed datasets to processed directory."""
-    print("\n" + "="*70)
-    print("SAVING PREPROCESSED DATASETS")
-    print("="*70 + "\n")
-    
-    supplier_data.to_csv(str(config.PROCESSED_DATA_FILES['supplier']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['supplier']}")
-    
-    commodity_data.to_csv(str(config.PROCESSED_DATA_FILES['commodity']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['commodity']}")
-    
-    co2_data.to_csv(str(config.PROCESSED_DATA_FILES['co2']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['co2']}")
-    
-    esg_data.to_csv(str(config.PROCESSED_DATA_FILES['esg']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['esg']}")
-    
-    esg_industry.to_csv(str(config.PROCESSED_DATA_FILES['esg_industry']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['esg_industry']}")
-
-
-def save_integrated_dataset(integrated_data, enhanced_data):
-    """Save integrated and enhanced datasets."""
-    print("\n" + "="*70)
-    print("SAVING INTEGRATED & ENHANCED DATASETS")
-    print("="*70 + "\n")
-    
-    integrated_data.to_csv(str(config.PROCESSED_DATA_FILES['integrated']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['integrated']}")
-    
-    enhanced_data.to_csv(str(config.PROCESSED_DATA_FILES['enhanced']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['enhanced']}")
 
 
 def main():
     """
-    Main pipeline orchestrator.
-    Runs complete analysis including preprocessing, integration, analysis,
-    modeling, Fuzzy AHP-TOPSIS-GA, visualization, and reporting.
+    Run the complete analysis pipeline.
     """
     print("="*70)
-    print("GREEN SUPPLY CHAIN RISK MANAGEMENT - COMPLETE ANALYSIS PIPELINE")
+    print("GREEN SUPPLY CHAIN RISK MANAGEMENT - FULL ANALYSIS PIPELINE")
     print("="*70)
     print()
     
     # Set random seed
-    set_random_seeds(config.RANDOM_SEED)
+    np.random.seed(config.RANDOM_SEED)
     
     # =====================================================================
     # STEP 1: LOAD AND PREPROCESS DATA
     # =====================================================================
-    print("\nSTEP 1: Loading and Preprocessing Data")
+    print("STEP 1: Loading and Preprocessing Data")
     print("-" * 70)
     
-    supplier_data, commodity_data, co2_data, esg_data = load_raw_datasets()
+    try:
+        supplier_data = pd.read_csv(config.RAW_DATA_FILES['supplier'])
+        commodity_data = pd.read_csv(config.RAW_DATA_FILES['commodity'])
+        co2_data = pd.read_csv(config.RAW_DATA_FILES['co2'])
+        esg_data = pd.read_csv(config.RAW_DATA_FILES['esg'])
+        
+        print("✓ Raw data loaded successfully")
+    except FileNotFoundError as e:
+        print(f"✗ Error loading data: {e}")
+        print("Please ensure all data files are in the data/raw directory")
+        return
     
     # Preprocess data
     supplier_data = preprocess_supplier_data(supplier_data)
@@ -153,12 +91,6 @@ def main():
     esg_industry = aggregate_esg_by_industry(esg_data)
     
     print("✓ Data preprocessing completed")
-    
-    # Display preprocessing summary
-    display_preprocessing_summary(supplier_data, commodity_data, co2_data, esg_industry)
-    
-    # Save preprocessed datasets
-    save_processed_datasets(supplier_data, commodity_data, co2_data, esg_data, esg_industry)
     print()
     
     # =====================================================================
@@ -175,12 +107,6 @@ def main():
     enhanced_data = calculate_risk_metrics(integrated_data)
     
     print("✓ Dataset integration and risk calculation completed")
-    
-    # Save integrated datasets
-    save_integrated_dataset(integrated_data, enhanced_data)
-    
-    # Display integration summary
-    display_integration_summary(integrated_data, enhanced_data)
     print()
     
     # =====================================================================
@@ -252,50 +178,9 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 5: FUZZY AHP-TOPSIS-GA SUPPLIER RANKING
+    # STEP 5: MODEL EVALUATION
     # =====================================================================
-    print("STEP 5: Fuzzy AHP-TOPSIS-GA Supplier Ranking")
-    print("-" * 70)
-    
-    # Filter criteria columns to only those that exist in the data
-    available_criteria = [col for col in config.TOPSIS_CRITERIA_COLUMNS if col in enhanced_data.columns]
-    
-    if len(available_criteria) > 0:
-        # Match criteria types to available criteria
-        criteria_indices = [config.TOPSIS_CRITERIA_COLUMNS.index(col) for col in available_criteria]
-        available_criteria_types = [config.TOPSIS_CRITERIA_TYPES[i] for i in criteria_indices]
-        
-        # Perform Fuzzy AHP-TOPSIS-GA analysis
-        topsis_results = analyze_supplier_ranking(
-            enhanced_data,
-            criteria_columns=available_criteria,
-            criteria_types=available_criteria_types,
-            supplier_id_column='Supplier_ID',
-            top_n=config.FUZZY_AHP_TOPSIS_GA_CONFIG['top_n_suppliers'],
-            use_ga_optimization=config.FUZZY_AHP_TOPSIS_GA_CONFIG['use_ga_optimization'],
-            random_state=config.RANDOM_SEED
-        )
-        
-        # Save ranking results
-        ranking_output_path = config.PROCESSED_DATA_DIR / "supplier_ranking_topsis.csv"
-        # Extract just the ranking columns for CSV export
-        ranking_export = enhanced_data[['Supplier_ID']].copy()
-        ranking_export = ranking_export.merge(
-            topsis_results['ranking_results'][['Supplier_ID', 'TOPSIS_Score', 'Rank']],
-            on='Supplier_ID',
-            how='left'
-        )
-        ranking_export.to_csv(ranking_output_path, index=False)
-        print(f"✓ Supplier ranking saved to: {ranking_output_path}")
-    else:
-        print("⚠ Warning: No valid criteria columns found for TOPSIS analysis")
-        topsis_results = None
-    print()
-    
-    # =====================================================================
-    # STEP 6: MODEL EVALUATION
-    # =====================================================================
-    print("STEP 6: Evaluating Models")
+    print("STEP 5: Evaluating Models")
     print("-" * 70)
     
     # Generate evaluation reports
@@ -333,28 +218,22 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 7: VISUALIZATION
+    # STEP 6: VISUALIZATION
     # =====================================================================
-    print("STEP 7: Creating Visualizations")
+    print("STEP 6: Creating Visualizations")
     print("-" * 70)
-    
-    # Prepare ranking data for visualization
-    ranking_data_for_viz = None
-    if topsis_results:
-        ranking_data_for_viz = topsis_results['ranking_results']
     
     create_comprehensive_dashboard(
         enhanced_data,
-        output_dir=str(config.VISUALIZATIONS_DIR),
-        ranking_data=ranking_data_for_viz
+        output_dir=str(config.VISUALIZATIONS_DIR)
     )
     print("✓ Comprehensive visualization dashboard created")
     print()
     
     # =====================================================================
-    # STEP 8: REPORT GENERATION
+    # STEP 7: REPORT GENERATION
     # =====================================================================
-    print("STEP 8: Generating Reports")
+    print("STEP 7: Generating Reports")
     print("-" * 70)
     
     # Executive summary
@@ -385,7 +264,7 @@ def main():
     # COMPLETION
     # =====================================================================
     print("="*70)
-    print("✓ COMPLETE ANALYSIS PIPELINE EXECUTED SUCCESSFULLY")
+    print("✓ FULL ANALYSIS PIPELINE COMPLETED SUCCESSFULLY")
     print("="*70)
     print()
     print("Output Summary:")
@@ -399,27 +278,9 @@ def main():
     print(f"  - Average Risk Score: {enhanced_data['Overall_Risk_Score'].mean():.2f}")
     print(f"  - Prediction Model R²: {prediction_model['test_metrics']['r2']:.4f}")
     print(f"  - Classification Accuracy: {classification_model['test_metrics']['accuracy']:.4f}")
-    if topsis_results:
-        print(f"  - Top Ranked Supplier: {topsis_results['ranking_results'].iloc[0]['Supplier_ID']} "
-              f"(TOPSIS Score: {topsis_results['ranking_results'].iloc[0]['TOPSIS_Score']:.4f})")
     print()
-    print("📊 Output Files Generated:")
-    print(f"  1. {config.PROCESSED_DATA_DIR}/preprocessed_supplier_data.csv")
-    print(f"  2. {config.PROCESSED_DATA_DIR}/preprocessed_commodity_data.csv")
-    print(f"  3. {config.PROCESSED_DATA_DIR}/preprocessed_co2_data.csv")
-    print(f"  4. {config.PROCESSED_DATA_DIR}/preprocessed_esg_data.csv")
-    print(f"  5. {config.PROCESSED_DATA_DIR}/preprocessed_esg_by_industry.csv")
-    print(f"  6. {config.PROCESSED_DATA_DIR}/integrated_commodity_dataset.csv")
-    print(f"  7. {config.PROCESSED_DATA_DIR}/integrated_dataset_with_risk_metrics.csv")
-    if topsis_results:
-        print(f"  8. {config.PROCESSED_DATA_DIR}/supplier_ranking_topsis.csv")
-    print()
-    print(f"🔒 Reproducibility Guarantee:")
-    print(f"   Random seed fixed to RANDOM_SEED={config.RANDOM_SEED}")
-    print(f"   All results will be identical on every run.\n")
-    
-    return enhanced_data
 
 
 if __name__ == "__main__":
-    enhanced_data = main()
+    main()
+
