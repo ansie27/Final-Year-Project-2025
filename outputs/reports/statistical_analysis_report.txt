@@ -1,0 +1,37 @@
+======================================================================
+STATISTICAL ANALYSIS REPORT
+======================================================================
+
+Dataset Overview:
+  Total Records: 5000
+  Total Features: 59
+  Missing Values: 121331
+
+Overall Risk Score Statistics:
+  Count: 5000.00
+  Mean: 27.81
+  Std: 27.13
+  Min: -165.84
+  25%: 22.14
+  50%: 30.90
+  75%: 39.29
+  Max: 66.32
+
+Risk Distribution by Classification:
+  Medium: 2621 (52.4%)
+  Low: 2371 (47.4%)
+  High: 8 (0.2%)
+
+Top 10 Features Correlated with Overall Risk:
+  1. Environmental_Risk_Score: 0.900
+  2. Compliance_Risk_Score: 0.428
+  3. Compliance_Level: 0.320
+  4. Operational_Risk_Score: 0.107
+  5. Defect_Rate: 0.099
+  6. Renewable_Energy_Usage: 0.074
+  7. Financial_Risk_Score: 0.057
+  8. Financial_Stability_Score: 0.055
+  9. On_Time_Delivery_Rate: 0.042
+  10. ESG_Score: 0.011
+
+======================================================================

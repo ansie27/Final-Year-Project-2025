@@ -1,0 +1,29 @@
+======================================================================
+MODEL EVALUATION REPORT
+======================================================================
+
+Training Metrics:
+  MSE: 0.2037
+  MAE: 0.2482
+  R2: 0.9997
+  RMSE: 0.4513
+
+Test Metrics:
+  MSE: 1.0280
+  MAE: 0.6251
+  R2: 0.9985
+  RMSE: 1.0139
+
+Top 10 Most Important Features:
+  Environmental_Risk_Score: 0.8099
+  Compliance_Risk_Score: 0.1648
+  Operational_Risk_Score: 0.0131
+  Financial_Risk_Score: 0.0045
+  Compliance_Level: 0.0038
+  Financial_Stability_Score: 0.0014
+  Defect_Rate: 0.0011
+  Renewable_Energy_Usage: 0.0002
+  Environmental_Score: 0.0002
+  Lead_Time_Days: 0.0002
+
+======================================================================

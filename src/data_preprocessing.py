@@ -150,10 +150,7 @@ def preprocess_commodity_data(commodity_data):
         for col, count in missing[missing > 0].items():
             print(f"      {col}: {count}")
         # Forward fill for emission factors
-        commodity_data['Supply Chain Emission Factors with Margins'].fillna(
-            method='ffill',
-            inplace=True
-        )
+        commodity_data['Supply Chain Emission Factors with Margins'] = commodity_data['Supply Chain Emission Factors with Margins'].ffill()
     else:
         print(f"   No missing values")
     
