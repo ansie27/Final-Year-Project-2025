@@ -29,7 +29,7 @@ from data_preprocessing import (
     calculate_risk_metrics,
     display_preprocessing_summary
 )
-from data_integration import integrate_supplier_dataset, display_integration_summary
+from data_integration import integrate_datasets
 from feature_engineering import (
     engineer_supplier_features,
     engineer_commodity_features,
@@ -59,7 +59,16 @@ from reporting import (
     export_results_to_json
 )
 from draft_fuzzy_ahp_topsis_ga import analyze_supplier_ranking # change this back later
-from synthetic_data_generation import ModelSelector, generate_synthetic_data
+
+# Conditional import for synthetic data generation (requires sdv package)
+try:
+    from synthetic_data_generation import ModelSelector, generate_synthetic_data
+    SYNTHETIC_DATA_AVAILABLE = True
+except ImportError:
+    SYNTHETIC_DATA_AVAILABLE = False
+    ModelSelector = None
+    generate_synthetic_data = None
+
 import config
 
 
@@ -77,21 +86,21 @@ def load_raw_datasets():
     
     try:
         supplier_data = pd.read_csv(config.RAW_DATA_FILES['supplier'])
-        print(f"✓ Loaded supplier data: {supplier_data.shape}")
+        print(f"[*] Loaded supplier data: {supplier_data.shape}")
         
         commodity_data = pd.read_csv(config.RAW_DATA_FILES['commodity'])
-        print(f"✓ Loaded commodity/GHG data: {commodity_data.shape}")
+        print(f"[*] Loaded commodity/GHG data: {commodity_data.shape}")
         
         co2_data = pd.read_csv(config.RAW_DATA_FILES['co2'])
-        print(f"✓ Loaded CO2 data: {co2_data.shape}")
+        print(f"[*] Loaded CO2 data: {co2_data.shape}")
         
         esg_data = pd.read_csv(config.RAW_DATA_FILES['esg'])
-        print(f"✓ Loaded S&P 500 ESG data: {esg_data.shape}")
+        print(f"[*] Loaded S&P 500 ESG data: {esg_data.shape}")
         
         return supplier_data, commodity_data, co2_data, esg_data
     
     except FileNotFoundError as e:
-        print(f"✗ Error loading data: {e}")
+        print(f"[!] Error loading data: {e}")
         print("Please ensure all data files are in the data/raw directory")
         sys.exit(1)
 
@@ -103,19 +112,19 @@ def save_processed_datasets(supplier_data, commodity_data, co2_data, esg_data, e
     print("="*70 + "\n")
     
     supplier_data.to_csv(str(config.PROCESSED_DATA_FILES['supplier']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['supplier']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['supplier']}")
     
     commodity_data.to_csv(str(config.PROCESSED_DATA_FILES['commodity']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['commodity']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['commodity']}")
     
     co2_data.to_csv(str(config.PROCESSED_DATA_FILES['co2']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['co2']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['co2']}")
     
     esg_data.to_csv(str(config.PROCESSED_DATA_FILES['esg']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['esg']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['esg']}")
     
     esg_industry.to_csv(str(config.PROCESSED_DATA_FILES['esg_industry']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['esg_industry']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['esg_industry']}")
 
 
 def save_engineered_datasets(supplier_features, commodity_features):
@@ -128,13 +137,13 @@ def save_engineered_datasets(supplier_features, commodity_features):
         str(config.PROCESSED_DATA_DIR / "supplier_dataset_with_features.csv"),
         index=False
     )
-    print(f"✓ Saved: supplier_dataset_with_features.csv")
+    print(f"[*] Saved: supplier_dataset_with_features.csv")
     
     commodity_features.to_csv(
         str(config.PROCESSED_DATA_DIR / "commodity_dataset_with_features.csv"),
         index=False
     )
-    print(f"✓ Saved: commodity_dataset_with_features.csv")
+    print(f"[*] Saved: commodity_dataset_with_features.csv")
 
 
 def save_final_datasets(supplier_with_risk, commodity_features):
@@ -147,13 +156,13 @@ def save_final_datasets(supplier_with_risk, commodity_features):
         str(config.PROCESSED_DATA_DIR / "supplier_dataset_final.csv"),
         index=False
     )
-    print(f"✓ Saved: supplier_dataset_final.csv")
+    print(f"[*] Saved: supplier_dataset_final.csv")
     
     commodity_features.to_csv(
         str(config.PROCESSED_DATA_DIR / "commodity_dataset_final.csv"),
         index=False
     )
-    print(f"✓ Saved: commodity_dataset_final.csv")
+    print(f"[*] Saved: commodity_dataset_final.csv")
 
 
 def save_integrated_dataset(integrated_data, enhanced_data):
@@ -163,10 +172,10 @@ def save_integrated_dataset(integrated_data, enhanced_data):
     print("="*70 + "\n")
     
     integrated_data.to_csv(str(config.PROCESSED_DATA_FILES['integrated']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['integrated']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['integrated']}")
     
     enhanced_data.to_csv(str(config.PROCESSED_DATA_FILES['enhanced']), index=False)
-    print(f"✓ Saved: {config.PROCESSED_DATA_FILES['enhanced']}")
+    print(f"[*] Saved: {config.PROCESSED_DATA_FILES['enhanced']}")
 
 
 def main():
@@ -203,7 +212,7 @@ def main():
     esg_data = preprocess_esg_data(esg_data)
     esg_industry = aggregate_esg_by_industry(esg_data)
     
-    print("✓ Data preprocessing completed")
+    print("* Data preprocessing completed")
     
     # Display preprocessing summary
     display_preprocessing_summary(supplier_data, commodity_data, co2_data, esg_industry)
@@ -221,7 +230,7 @@ def main():
     supplier_features = engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_industry)
     commodity_features = engineer_commodity_features(commodity_data, co2_data, esg_industry)
     
-    print("✓ Feature engineering completed")
+    print("* Feature engineering completed")
     
     # Display feature engineering summary
     display_feature_engineering_summary(supplier_features, commodity_features)
@@ -236,8 +245,11 @@ def main():
     print("STEP 3: Synthetic Data Generation with Best Model Selection")
     print("-" * 70)
     
-    # Check if synthetic data generation is enabled in config
-    if hasattr(config, 'SYNTHETIC_DATA_CONFIG') and config.SYNTHETIC_DATA_CONFIG.get('enabled', True):
+    # Check if synthetic data generation is enabled and available
+    if not SYNTHETIC_DATA_AVAILABLE:
+        print("Warning: Synthetic data generation module not available (sdv package not installed)")
+        print("  Skipping synthetic data generation...")
+    elif hasattr(config, 'SYNTHETIC_DATA_CONFIG') and config.SYNTHETIC_DATA_CONFIG.get('enabled', True):
         try:
             # Initialize model selector
             selector = ModelSelector(output_dir=config.MODEL_SELECTION_DIR)
@@ -258,9 +270,9 @@ def main():
                                     'supplier': cached['supplier']['best_model'],
                                     'commodity': cached['commodity']['best_model']
                                 }
-                                print("✓ Using cached model selection results")
+                                print("* Using cached model selection results")
                     except Exception as e:
-                        print(f"⚠ Could not load cached selection: {e}")
+                        print(f"Warning: Could not load cached selection: {e}")
             
             # If no cached selection, run model comparison
             if best_models is None:
@@ -274,7 +286,7 @@ def main():
                     save_results=True
                 )
             
-            print(f"✓ Selected models - Supplier: {best_models['supplier']}, Commodity: {best_models['commodity']}")
+            print(f"* Selected models - Supplier: {best_models['supplier']}, Commodity: {best_models['commodity']}")
             
             # Generate synthetic data using best models
             print("\nGenerating synthetic data using selected best models...")
@@ -289,7 +301,7 @@ def main():
                 save_model=config.SYNTHETIC_DATA_CONFIG.get('save_models', True),
                 model_save_path=config.SYNTHETIC_MODEL_FILES['supplier'] if config.SYNTHETIC_DATA_CONFIG.get('save_models', True) else None
             )
-            print(f"✓ Generated synthetic supplier data: {supplier_synthetic.shape}")
+            print(f"* Generated synthetic supplier data: {supplier_synthetic.shape}")
             
             # Generate synthetic commodity data
             commodity_synthetic, commodity_generator = generate_synthetic_data(
@@ -301,12 +313,12 @@ def main():
                 save_model=config.SYNTHETIC_DATA_CONFIG.get('save_models', True),
                 model_save_path=config.SYNTHETIC_MODEL_FILES['commodity'] if config.SYNTHETIC_DATA_CONFIG.get('save_models', True) else None
             )
-            print(f"✓ Generated synthetic commodity data: {commodity_synthetic.shape}")
+            print(f"* Generated synthetic commodity data: {commodity_synthetic.shape}")
             
-            print("✓ Synthetic data generation completed")
+            print("* Synthetic data generation completed")
             
         except Exception as e:
-            print(f"⚠ Warning: Synthetic data generation failed: {e}")
+            print(f"Warning: Synthetic data generation failed: {e}")
             print("  Continuing with original data...")
     else:
         print("Synthetic data generation is disabled in config")
@@ -320,7 +332,7 @@ def main():
     
     supplier_with_risk = calculate_risk_metrics(supplier_features)
     
-    print("✓ Risk metrics calculated")
+    print("* Risk metrics calculated")
     
     # Save final datasets
     save_final_datasets(supplier_with_risk, commodity_features)
@@ -337,11 +349,11 @@ def main():
     
     # Descriptive statistics
     stats = calculate_descriptive_statistics(enhanced_data)
-    print("✓ Descriptive statistics calculated")
+    print("* Descriptive statistics calculated")
     
     # Correlation analysis
     correlation_matrix = calculate_correlation_matrix(enhanced_data)
-    print("✓ Correlation matrix calculated")
+    print("* Correlation matrix calculated")
     
     # Feature importance
     feature_importance = calculate_feature_importance(
@@ -349,14 +361,14 @@ def main():
         target_column='Overall_Risk_Score',
         method='correlation'
     )
-    print("✓ Feature importance calculated")
+    print("* Feature importance calculated")
     
     # Generate analysis report
     analysis_report = generate_analysis_report(
         enhanced_data,
         output_path=str(config.REPORTS_DIR / "statistical_analysis_report.txt")
     )
-    print("✓ Statistical analysis report generated")
+    print("* Statistical analysis report generated")
     print()
     
     # =====================================================================
@@ -374,7 +386,7 @@ def main():
         test_size=config.MODEL_CONFIG['test_size'],
         random_state=config.RANDOM_SEED
     )
-    print(f"✓ Prediction model trained - R² Score: {prediction_model['test_metrics']['r2']:.4f}")
+    print(f"* Prediction model trained - R2 Score: {prediction_model['test_metrics']['r2']:.4f}")
     
     # Train risk classification model
     print("Training risk classification model (Random Forest)...")
@@ -385,7 +397,7 @@ def main():
         test_size=config.MODEL_CONFIG['test_size'],
         random_state=config.RANDOM_SEED
     )
-    print(f"✓ Classification model trained - Accuracy: {classification_model['test_metrics']['accuracy']:.4f}")
+    print(f"* Classification model trained - Accuracy: {classification_model['test_metrics']['accuracy']:.4f}")
     
     # Perform clustering
     print("Performing supplier clustering...")
@@ -394,7 +406,7 @@ def main():
         n_clusters=config.ANALYSIS_CONFIG['clustering_n_clusters'],
         method='kmeans'
     )
-    print(f"✓ Clustering completed - Silhouette Score: {clustering_results['silhouette_score']:.4f}")
+    print(f"* Clustering completed - Silhouette Score: {clustering_results['silhouette_score']:.4f}")
     print()
     
     # =====================================================================
@@ -432,9 +444,9 @@ def main():
             how='left'
         )
         ranking_export.to_csv(ranking_output_path, index=False)
-        print(f"✓ Supplier ranking saved to: {ranking_output_path}")
+        print(f"* Supplier ranking saved to: {ranking_output_path}")
     else:
-        print("⚠ Warning: No valid criteria columns found for TOPSIS analysis")
+        print("Warning: No valid criteria columns found for TOPSIS analysis")
         topsis_results = None
     print()
     
@@ -449,13 +461,13 @@ def main():
         prediction_model,
         output_path=str(config.REPORTS_DIR / "prediction_model_evaluation.txt")
     )
-    print("✓ Prediction model evaluation report generated")
+    print("* Prediction model evaluation report generated")
     
     class_eval_report = generate_evaluation_report(
         classification_model,
         output_path=str(config.REPORTS_DIR / "classification_model_evaluation.txt")
     )
-    print("✓ Classification model evaluation report generated")
+    print("* Classification model evaluation report generated")
     
     # Create evaluation plots
     plot_prediction_vs_actual(
@@ -464,7 +476,7 @@ def main():
         model_name='Risk Prediction Model',
         save_path=str(config.VISUALIZATIONS_DIR / "prediction_vs_actual.png")
     )
-    print("✓ Prediction vs actual plot saved")
+    print("* Prediction vs actual plot saved")
     
     if 'label_encoder' in classification_model:
         class_names = classification_model['label_encoder'].classes_
@@ -475,7 +487,7 @@ def main():
             model_name='Risk Classification Model',
             save_path=str(config.VISUALIZATIONS_DIR / "confusion_matrix.png")
         )
-        print("✓ Confusion matrix plot saved")
+        print("* Confusion matrix plot saved")
     print()
     
     # =====================================================================
@@ -494,7 +506,7 @@ def main():
         output_dir=str(config.VISUALIZATIONS_DIR),
         ranking_data=ranking_data_for_viz
     )
-    print("✓ Comprehensive visualization dashboard created")
+    print("* Comprehensive visualization dashboard created")
     print()
     
     # =====================================================================
@@ -508,7 +520,7 @@ def main():
         enhanced_data,
         output_path=str(config.REPORTS_DIR / "executive_summary.txt")
     )
-    print("✓ Executive summary generated")
+    print("* Executive summary generated")
     
     # Comprehensive report
     report_paths = generate_comprehensive_report(
@@ -517,21 +529,21 @@ def main():
         model_results={'prediction': prediction_model, 'classification': classification_model},
         output_dir=str(config.REPORTS_DIR)
     )
-    print("✓ Comprehensive reports generated")
+    print("* Comprehensive reports generated")
     
     # Export to JSON
     export_results_to_json(
         enhanced_data,
         output_path=str(config.OUTPUT_DIR / "results.json")
     )
-    print("✓ Results exported to JSON")
+    print("* Results exported to JSON")
     print()
     
     # =====================================================================
     # COMPLETION
     # =====================================================================
     print("="*70)
-    print("✓ COMPLETE ANALYSIS PIPELINE EXECUTED SUCCESSFULLY")
+    print("[SUCCESS] COMPLETE ANALYSIS PIPELINE EXECUTED SUCCESSFULLY")
     print("="*70)
     print()
     print("Output Summary:")
@@ -545,13 +557,13 @@ def main():
     print("Key Results:")
     print(f"  - Total Suppliers Analyzed: {enhanced_data['Supplier_ID'].nunique()}")
     print(f"  - Average Risk Score: {enhanced_data['Overall_Risk_Score'].mean():.2f}")
-    print(f"  - Prediction Model R²: {prediction_model['test_metrics']['r2']:.4f}")
+    print(f"  - Prediction Model R2: {prediction_model['test_metrics']['r2']:.4f}")
     print(f"  - Classification Accuracy: {classification_model['test_metrics']['accuracy']:.4f}")
     if topsis_results:
         print(f"  - Top Ranked Supplier: {topsis_results['ranking_results'].iloc[0]['Supplier_ID']} "
               f"(TOPSIS Score: {topsis_results['ranking_results'].iloc[0]['TOPSIS_Score']:.4f})")
     print()
-    print("📊 Output Files Generated:")
+    print("Output Files Generated:")
     print(f"  1. {config.PROCESSED_DATA_DIR}/preprocessed_supplier_data.csv")
     print(f"  2. {config.PROCESSED_DATA_DIR}/preprocessed_commodity_data.csv")
     print(f"  3. {config.PROCESSED_DATA_DIR}/preprocessed_co2_data.csv")
@@ -568,7 +580,7 @@ def main():
             print(f"  11. {config.SYNTHETIC_DATA_FILES['supplier']} (using {best_models['supplier']})")
             print(f"  12. {config.SYNTHETIC_DATA_FILES['commodity']} (using {best_models['commodity']})")
     print()
-    print(f"🔒 Reproducibility Guarantee:")
+    print(f"Reproducibility Guarantee:")
     print(f"   Random seed fixed to RANDOM_SEED={config.RANDOM_SEED}")
     print(f"   All results will be identical on every run.\n")
     

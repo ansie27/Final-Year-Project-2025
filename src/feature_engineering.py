@@ -16,18 +16,20 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     Parameters:
     -----------
     supplier_data : pd.DataFrame
-        Preprocessed supplier data
+        Preprocessed supplier data with columns: Supplier_ID, Country, Industry_Sector,
+        Carbon_Emission_Intensity, Production_Capacity, On_Time_Delivery_Rate, Defect_Rate,
+        etc.
     commodity_data : pd.DataFrame
-        GHG emission factors data
+        Preprocessed commodity/GHG data
     co2_data : pd.DataFrame
-        CO2 emissions data
+        Preprocessed CO2 emissions data
     esg_industry : pd.DataFrame
-        ESG metrics by industry
+        ESG metrics aggregated by industry
         
     Returns:
     --------
     pd.DataFrame
-        Supplier dataset with engineered features
+        Supplier dataset with 9 engineered features
     """
     
     print("\n" + "="*70)
@@ -41,10 +43,10 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # =====================================================================
     print("\n[1] Engineering Emission-Capacity Features...")
     
-    # Avoid division by zero
+    # Avoid division by zero - Emission_to_Capacity_Ratio
     supplier_features['Emission_to_Capacity_Ratio'] = supplier_features.apply(
         lambda row: row['Carbon_Emission_Intensity'] / row['Production_Capacity'] 
-        if row['Production_Capacity'] > 0 else np.nan,
+        if pd.notna(row['Production_Capacity']) and row['Production_Capacity'] > 0 else np.nan,
         axis=1
     )
     supplier_features['Emission_to_Capacity_Ratio'] = supplier_features['Emission_to_Capacity_Ratio'].fillna(
@@ -57,7 +59,7 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # =====================================================================
     print("\n[2] Engineering Operational Reliability Features...")
     
-    # Operational Reliability Index
+    # Operational Reliability Index = On_Time_Delivery_Rate * (1 - Defect_Rate)
     supplier_features['Operational_Reliability_Index'] = (
         supplier_features['On_Time_Delivery_Rate'] * 
         (1 - supplier_features['Defect_Rate'])
@@ -68,7 +70,7 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # Lead Time to Capacity Ratio
     supplier_features['LeadTime_Capacity_Ratio'] = supplier_features.apply(
         lambda row: row['Lead_Time_Days'] / row['Production_Capacity']
-        if row['Production_Capacity'] > 0 else np.nan,
+        if pd.notna(row['Production_Capacity']) and row['Production_Capacity'] > 0 else np.nan,
         axis=1
     )
     supplier_features['LeadTime_Capacity_Ratio'] = supplier_features['LeadTime_Capacity_Ratio'].fillna(
@@ -81,7 +83,7 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # =====================================================================
     print("\n[3] Engineering Green Efficiency Features...")
     
-    # Green Efficiency Score (normalized 0-1)
+    # Green Efficiency Score = (Waste_Management_Efficiency + Renewable_Energy_Usage) / 2
     supplier_features['Green_Efficiency_Score'] = (
         supplier_features['Waste_Management_Efficiency'] + 
         supplier_features['Renewable_Energy_Usage']
@@ -94,10 +96,11 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     print("\n[4] Engineering Resilience Features...")
     
     # Resilience Score (normalized 0-100)
+    # = (Operational_Reliability × Financial_Stability × Compliance_Level) × 100
     supplier_features['Resilience_Score'] = (
         supplier_features['Operational_Reliability_Index'] * 
         (supplier_features['Financial_Stability_Score'] / 100) * 
-        (supplier_features['Compliance_Level'] / 3)  # Normalize to 0-1
+        (supplier_features['Compliance_Level'] / 3)
     ) * 100
     supplier_features['Resilience_Score'] = supplier_features['Resilience_Score'].clip(0, 100)
     print("   - Resilience_Score")
@@ -107,7 +110,7 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # =====================================================================
     print("\n[5] Engineering ESG-Compliance Features...")
     
-    # Merge with ESG data
+    # Merge with ESG data by Industry_Sector
     supplier_features = pd.merge(
         supplier_features,
         esg_industry[['Industry_Sector', 'Avg_ESG_Risk_Score', 'Avg_Environment_Risk', 
@@ -116,11 +119,12 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
         how='left'
     )
     
-    # ESG Compliance Composite (lower is better for risk score)
+    # ESG Compliance Composite
+    # Lower is better for risk scores (inverted ESG Score)
     supplier_features['ESG_Compliance_Composite'] = (
-        (100 - supplier_features['ESG_Score'].fillna(50)) * 0.4 +  # Lower ESG score = higher risk
-        (100 - supplier_features['Compliance_Level'].fillna(1.5) * 33.33) * 0.3 +  # Normalize compliance to 0-100
-        supplier_features['Labour_Compliance_Score'].fillna(50) * 0.3  # Direct score
+        (100 - supplier_features['ESG_Score'].fillna(50)) * 0.4 +
+        (100 - supplier_features['Compliance_Level'].fillna(1.5) * 33.33) * 0.3 +
+        supplier_features['Labour_Compliance_Score'].fillna(50) * 0.3
     )
     supplier_features['ESG_Compliance_Composite'] = supplier_features['ESG_Compliance_Composite'].clip(0, 100)
     print("   - ESG_Compliance_Composite")
@@ -129,7 +133,7 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     supplier_features['Social_Responsibility_Score'] = (
         supplier_features['Social_Score'].fillna(50) * 0.4 +
         supplier_features['Labour_Compliance_Score'].fillna(50) * 0.3 +
-        (supplier_features['Diversity_Index'].fillna(0.5) * 100) * 0.3  # Normalize
+        (supplier_features['Diversity_Index'].fillna(0.5) * 100) * 0.3
     )
     supplier_features['Social_Responsibility_Score'] = supplier_features['Social_Responsibility_Score'].clip(0, 100)
     print("   - Social_Responsibility_Score")
@@ -139,15 +143,15 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # =====================================================================
     print("\n[6] Engineering Sustainability Risk Index...")
     
-    # Normalized Cost Index for weighting
+    # Normalize Cost Index for weighting
     cost_norm = (supplier_features['Cost_Index'] - supplier_features['Cost_Index'].min()) / \
-                (supplier_features['Cost_Index'].max() - supplier_features['Cost_Index'].min())
+                (supplier_features['Cost_Index'].max() - supplier_features['Cost_Index'].min() + 1e-10)
     
     supplier_features['Sustainability_Risk_Index'] = (
-        (100 - supplier_features['Environmental_Score'].fillna(50)) * 0.35 +  # Environmental risk
-        (100 - supplier_features['ESG_Compliance_Composite']) * 0.25 +  # ESG/Compliance risk
-        supplier_features['Carbon_Emission_Intensity'].fillna(50) * 0.20 +  # Emissions risk
-        cost_norm * 100 * 0.20  # Cost/affordability risk
+        (100 - supplier_features['Environmental_Score'].fillna(50)) * 0.35 +
+        (100 - supplier_features['ESG_Compliance_Composite']) * 0.25 +
+        supplier_features['Carbon_Emission_Intensity'].fillna(50) * 0.20 +
+        cost_norm * 100 * 0.20
     )
     supplier_features['Sustainability_Risk_Index'] = supplier_features['Sustainability_Risk_Index'].clip(0, 100)
     print("   - Sustainability_Risk_Index")
@@ -157,10 +161,10 @@ def engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_indu
     # =====================================================================
     print("\n[7] Engineering Geographic Risk Features...")
     
-    # Merge CO2 data for country-level risk
+    # Get latest CO2 data per country
     co2_latest = co2_data.sort_values('year').drop_duplicates(
         subset=['Country'], keep='last'
-    )[['Country', 'co2', 'population']]
+    )[['Country', 'co2', 'population']].copy()
     
     co2_latest.rename(columns={
         'co2': 'Country_CO2_Emissions',
@@ -198,16 +202,17 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     Parameters:
     -----------
     commodity_data : pd.DataFrame
-        Preprocessed commodity/GHG data
+        Preprocessed commodity/GHG data with columns: Industry_Sector, GHG,
+        Supply Chain Emission Factors with Margins
     co2_data : pd.DataFrame
-        CO2 emissions data by country
+        Preprocessed CO2 emissions data by country
     esg_industry : pd.DataFrame
-        ESG metrics by industry
+        ESG metrics aggregated by industry
         
     Returns:
     --------
     pd.DataFrame
-        Commodity dataset with engineered features
+        Commodity dataset with 8 engineered features
     """
     
     print("\n" + "="*70)
@@ -221,7 +226,7 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     # =====================================================================
     print("\n[1] Engineering GHG Type Analysis Features...")
     
-    # GHG Type Dominance Score - which GHG dominates in each industry
+    # Identify which GHG is dominant (highest emission factor) per industry
     ghg_industry_pivot = commodity_features.pivot_table(
         index='Industry_Sector',
         columns='GHG',
@@ -229,14 +234,14 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
         aggfunc='mean'
     )
     
-    # Calculate which GHG is dominant (has highest emission factor)
+    # Get dominant GHG type per industry
     commodity_features['GHG_Dominance'] = commodity_features.apply(
         lambda row: ghg_industry_pivot.loc[row['Industry_Sector']].idxmax()
         if row['Industry_Sector'] in ghg_industry_pivot.index else 'Unknown',
         axis=1
     )
     
-    # GHG Type Dominance Score (0-1, where 1 = the dominant GHG in that industry)
+    # GHG Type Dominance Score: 1.0 if dominant, 0.5 otherwise
     commodity_features['GHG_Type_Dominance_Score'] = commodity_features.apply(
         lambda row: 1.0 if row['GHG'] == row['GHG_Dominance'] else 0.5,
         axis=1
@@ -249,14 +254,14 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     # =====================================================================
     print("\n[2] Engineering Emission Volatility Features...")
     
-    # Calculate standard deviation of emissions within each industry
+    # Calculate standard deviation of emission factors within each industry
     emission_std = commodity_features.groupby('Industry_Sector')[
         'Supply Chain Emission Factors with Margins'
     ].std().fillna(0)
     
     commodity_features['Emission_Volatility'] = commodity_features['Industry_Sector'].map(emission_std)
     
-    # Normalize volatility
+    # Normalize volatility to 0-100 scale
     if commodity_features['Emission_Volatility'].max() > 0:
         commodity_features['Emission_Volatility_Score'] = (
             commodity_features['Emission_Volatility'] / 
@@ -273,7 +278,7 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     # =====================================================================
     print("\n[3] Engineering Regional Risk Index...")
     
-    # Merge ESG data for industry-level risk context
+    # Merge ESG data to get industry-level environmental risk
     commodity_features = pd.merge(
         commodity_features,
         esg_industry[['Industry_Sector', 'Avg_ESG_Risk_Score', 'Avg_Environment_Risk']],
@@ -281,7 +286,7 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
         how='left'
     )
     
-    # Regional (Industry) Risk Index based on ESG environment risk
+    # Regional Risk Index: Weighted average of ESG and environment risk
     commodity_features['Regional_Risk_Index'] = (
         commodity_features['Avg_ESG_Risk_Score'].fillna(50) * 0.6 +
         commodity_features['Avg_Environment_Risk'].fillna(50) * 0.4
@@ -294,7 +299,7 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     # =====================================================================
     print("\n[4] Engineering Emission Intensity Features...")
     
-    # Normalize Supply Chain Emission Factors for comparison
+    # Normalize Supply Chain Emission Factors to 0-100 scale
     emission_min = commodity_features['Supply Chain Emission Factors with Margins'].min()
     emission_max = commodity_features['Supply Chain Emission Factors with Margins'].max()
     
@@ -313,11 +318,11 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     # =====================================================================
     print("\n[5] Engineering Industry Emission Profile...")
     
-    # Count GHG types per industry
+    # Count number of GHG types per industry
     ghg_count_per_industry = commodity_features.groupby('Industry_Sector')['GHG'].nunique()
     commodity_features['GHG_Types_Count'] = commodity_features['Industry_Sector'].map(ghg_count_per_industry)
     
-    # Complexity Score - industries with more GHG types have higher complexity
+    # Industry Complexity Score: Higher GHG type count = higher complexity
     commodity_features['Industry_Complexity_Score'] = (
         (commodity_features['GHG_Types_Count'] / commodity_features['GHG_Types_Count'].max()) * 100
     )
@@ -329,6 +334,7 @@ def engineer_commodity_features(commodity_data, co2_data, esg_industry):
     # =====================================================================
     print("\n[6] Engineering Combined Commodity Risk Score...")
     
+    # Weighted composite risk score
     commodity_features['Commodity_Risk_Score'] = (
         commodity_features['Normalized_Emission_Factor'] * 0.35 +
         commodity_features['Regional_Risk_Index'] * 0.30 +
