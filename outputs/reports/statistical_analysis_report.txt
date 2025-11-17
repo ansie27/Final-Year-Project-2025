@@ -4,8 +4,8 @@ STATISTICAL ANALYSIS REPORT
 
 Dataset Overview:
   Total Records: 5000
-  Total Features: 59
-  Missing Values: 121331
+  Total Features: 47
+  Missing Values: 22143
 
 Overall Risk Score Statistics:
   Count: 5000.00

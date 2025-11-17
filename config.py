@@ -189,3 +189,38 @@ TOPSIS_CRITERIA_TYPES = [
     'benefit'   # Renewable_Energy_Usage
 ]
 
+# =====================================================================
+# SYNTHETIC DATA GENERATION PARAMETERS
+# =====================================================================
+SYNTHETIC_DATA_CONFIG = {
+    'enabled': True,  # Enable/disable synthetic data generation in pipeline
+    'comparison_epochs': 300,  # Epochs for model comparison
+    'generation_epochs': 300,  # Epochs for final generation
+    'supplier_target_col': 'Overall_Risk_Score',  # Target for ML utility evaluation
+    'commodity_target_col': None,  # Target for commodity ML utility (if applicable)
+    'save_models': True,  # Whether to save trained models
+    'save_synthetic_data': True,  # Whether to save generated synthetic data
+    'use_cached_selection': True,  # Use cached model selection if available
+}
+
+# Synthetic data output paths
+SYNTHETIC_DATA_DIR = OUTPUT_DIR / "synthetic_data"
+SYNTHETIC_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+SYNTHETIC_DATA_FILES = {
+    'supplier': SYNTHETIC_DATA_DIR / "synthetic_supplier_data.csv",
+    'commodity': SYNTHETIC_DATA_DIR / "synthetic_commodity_data.csv",
+}
+
+SYNTHETIC_MODEL_DIR = MODELS_DIR / "synthetic_generators"
+SYNTHETIC_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+SYNTHETIC_MODEL_FILES = {
+    'supplier': SYNTHETIC_MODEL_DIR / "supplier_generator",
+    'commodity': SYNTHETIC_MODEL_DIR / "commodity_generator",
+}
+
+# Model selection results path
+MODEL_SELECTION_DIR = OUTPUT_DIR / "synthetic_data_generation"
+MODEL_SELECTION_DIR.mkdir(parents=True, exist_ok=True)
+

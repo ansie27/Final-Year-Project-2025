@@ -14,17 +14,23 @@ Financial_Stability_Score                  0.025976  ...         -0.012346
 Compliance_Level                          -0.015507  ...          1.000000
 
 [13 rows x 13 columns], 'feature_importance':                                Feature  Importance  Correlation
-48            Environmental_Risk_Score    0.899547     0.899547
-49               Compliance_Risk_Score    0.428206     0.428206
+36            Environmental_Risk_Score    0.899547     0.899547
+37               Compliance_Risk_Score    0.428206     0.428206
+25                    Resilience_Score    0.323197    -0.323197
 8                     Compliance_Level    0.320009    -0.320009
 9   Sustainability_Report_Availability    0.287434    -0.287434
-50              Operational_Risk_Score    0.107266     0.107266
+30            ESG_Compliance_Composite    0.256144     0.256144
+32           Sustainability_Risk_Index    0.111666    -0.111666
+38              Operational_Risk_Score    0.107266     0.107266
 13                         Defect_Rate    0.099493     0.099493
 7               Renewable_Energy_Usage    0.074492    -0.074492
-51                Financial_Risk_Score    0.056632     0.056632
+22       Operational_Reliability_Index    0.073962    -0.073962
+39                Financial_Risk_Score    0.056632     0.056632
 14           Financial_Stability_Score    0.054898    -0.054898
+24              Green_Efficiency_Score    0.049144    -0.049144
 12               On_Time_Delivery_Rate    0.042345    -0.042345
 6          Waste_Management_Efficiency    0.018490     0.018490
+21          Emission_to_Capacity_Ratio    0.015620    -0.015620
 3                         Social_Score    0.014700     0.014700
 0                        Supplier_Tier    0.014622     0.014622
 4                     Governance_Score    0.014225     0.014225
@@ -33,36 +39,18 @@ Compliance_Level                          -0.015507  ...          1.000000
 10                      Lead_Time_Days    0.011118     0.011118
 1                            ESG_Score    0.010571    -0.010571
 2                  Environmental_Score    0.007780    -0.007780
-47                  Country_Population    0.006184    -0.006184
-45         Country_Total_CO2_Emissions    0.005874    -0.005874
+35            Country_Carbon_Intensity    0.007581     0.007581
+31         Social_Responsibility_Score    0.006538     0.006538
+34                  Country_Population    0.006184    -0.006184
+33               Country_CO2_Emissions    0.005874    -0.005874
 15                          Cost_Index    0.005605     0.005605
 20               Logistics_Distance_km    0.004256     0.004256
 16             Labour_Compliance_Score    0.004116     0.004116
+23             LeadTime_Capacity_Ratio    0.003303    -0.003303
 19              Incident_History_Count    0.002869     0.002869
 5            Carbon_Emission_Intensity    0.001480     0.001480
 11                 Production_Capacity    0.000903    -0.000903
-21                      Carbon dioxide         NaN          NaN
-22                Carbon tetrafluoride         NaN          NaN
-23                             HFC-125         NaN          NaN
-24                            HFC-134a         NaN          NaN
-25                            HFC-143a         NaN          NaN
-26                              HFC-23         NaN          NaN
-27                           HFC-236fa         NaN          NaN
-28                              HFC-32         NaN          NaN
-29          HFCs and PFCs, unspecified         NaN          NaN
-30                    Hexafluoroethane         NaN          NaN
-31                             Methane         NaN          NaN
-32                Nitrogen trifluoride         NaN          NaN
-33                       Nitrous oxide         NaN          NaN
-34                Perfluorocyclobutane         NaN          NaN
-35                    Perfluoropropane         NaN          NaN
-36                 Sulfur hexafluoride         NaN          NaN
-37                  Avg_ESG_Risk_Score         NaN          NaN
-38                  Std_ESG_Risk_Score         NaN          NaN
-39                       Company_Count         NaN          NaN
-40                Avg_Environment_Risk         NaN          NaN
-41                 Avg_Governance_Risk         NaN          NaN
-42                     Avg_Social_Risk         NaN          NaN
-43               Avg_Controversy_Score         NaN          NaN
-44                       CO2_Data_Year         NaN          NaN
-46                         Country_GDP         NaN          NaN}
+26                  Avg_ESG_Risk_Score         NaN          NaN
+27                Avg_Environment_Risk         NaN          NaN
+28                 Avg_Governance_Risk         NaN          NaN
+29                     Avg_Social_Risk         NaN          NaN}
