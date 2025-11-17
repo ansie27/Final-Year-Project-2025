@@ -1,17 +1,17 @@
-{'correlation_matrix':                            Environmental_Risk_Score  ...  Compliance_Level
-Environmental_Risk_Score                   1.000000  ...         -0.015507
-Compliance_Risk_Score                      0.017756  ...         -0.746016
-Operational_Risk_Score                    -0.004627  ...          0.016892
-Financial_Risk_Score                      -0.024610  ...          0.019402
-Overall_Risk_Score                         0.899547  ...         -0.320009
-Environmental_Score                       -0.020827  ...         -0.015626
-ESG_Score                                 -0.003946  ...          0.011876
-Carbon_Emission_Intensity                  0.005449  ...          0.017274
-Renewable_Energy_Usage                    -0.701495  ...          0.003423
-On_Time_Delivery_Rate                     -0.014730  ...          0.007279
-Defect_Rate                               -0.008940  ...          0.019919
-Financial_Stability_Score                  0.025976  ...         -0.012346
-Compliance_Level                          -0.015507  ...          1.000000
+{'correlation_matrix':                            Environmental_Risk_Score  Compliance_Risk_Score  ...  Financial_Stability_Score  Compliance_Level
+Environmental_Risk_Score                   1.000000               0.017756  ...                   0.025976         -0.015507
+Compliance_Risk_Score                      0.017756               1.000000  ...                   0.000941         -0.746016
+Operational_Risk_Score                    -0.004627              -0.020105  ...                  -0.004327          0.016892
+Financial_Risk_Score                      -0.024610              -0.005454  ...                  -1.000000          0.019402
+Overall_Risk_Score                         0.899547               0.428206  ...                  -0.054898         -0.320009
+Environmental_Score                       -0.020827               0.013987  ...                  -0.019200         -0.015626
+ESG_Score                                 -0.003946              -0.019865  ...                  -0.000455          0.011876
+Carbon_Emission_Intensity                  0.005449              -0.010827  ...                  -0.013035          0.017274
+Renewable_Energy_Usage                    -0.701495               0.001385  ...                  -0.011441          0.003423
+On_Time_Delivery_Rate                     -0.014730               0.003065  ...                   0.016745          0.007279
+Defect_Rate                               -0.008940              -0.019916  ...                  -0.000083          0.019919
+Financial_Stability_Score                  0.025976               0.000941  ...                   1.000000         -0.012346
+Compliance_Level                          -0.015507              -0.746016  ...                  -0.012346          1.000000
 
 [13 rows x 13 columns], 'feature_importance':                                Feature  Importance  Correlation
 36            Environmental_Risk_Score    0.899547     0.899547

@@ -190,13 +190,22 @@ def preprocess_esg_data(esg_data):
     
     print(f"\nInitial dataset shape: {esg_data.shape}")
     
-    # Rename columns for consistency
+    # Rename / create columns for consistency
     print("\n[1] Standardizing column names...")
-    esg_data.rename(columns={
-        'Industry': 'Industry_Sector',
-        'Sector': 'Sector_Classification'
-    }, inplace=True)
-    print(f"   * Column names standardized")
+
+    # Keep original 'Industry' column (needed by data_integration.integrate_supplier_datasets)
+    # but also create a standardized 'Industry_Sector' version used throughout the pipeline.
+    if 'Industry' in esg_data.columns and 'Industry_Sector' not in esg_data.columns:
+        esg_data['Industry_Sector'] = esg_data['Industry']
+    elif 'Industry_Sector' in esg_data.columns and 'Industry' not in esg_data.columns:
+        # Ensure downstream functions that expect 'Industry' can still operate
+        esg_data['Industry'] = esg_data['Industry_Sector']
+
+    # Standardize sector naming
+    if 'Sector' in esg_data.columns and 'Sector_Classification' not in esg_data.columns:
+        esg_data.rename(columns={'Sector': 'Sector_Classification'}, inplace=True)
+
+    print(f"   * Column names standardized (Industry / Industry_Sector, Sector_Classification)")
     
     # Handle missing values
     print("\n[2] Handling missing values...")
@@ -214,15 +223,19 @@ def preprocess_esg_data(esg_data):
                 # Fill with ESG component average
                 median_val = esg_data[col].median()
                 esg_data[col].fillna(median_val, inplace=True)
-                print(f"   ✓ Filled {col}: {missing_count} records")
+                print(f"   [+] Filled {col}: {missing_count} records")
     
     # Handle controversy scores
     if 'Controversy Score' in esg_data.columns:
         esg_data['Controversy Score'].fillna(0, inplace=True)
     
-    print("\n[3] Standardizing Industry_Sector names...")
-    # Standardize industry names
-    esg_data['Industry_Sector'] = esg_data['Industry_Sector'].str.strip().str.title()
+    print("\n[3] Standardizing Industry / Industry_Sector names...")
+    # Standardize industry names on the Industry_Sector column
+    if 'Industry_Sector' in esg_data.columns:
+        esg_data['Industry_Sector'] = esg_data['Industry_Sector'].astype(str).str.strip().str.title()
+    # Keep 'Industry' in sync for compatibility with integration module
+    if 'Industry' in esg_data.columns:
+        esg_data['Industry'] = esg_data['Industry'].astype(str).str.strip().str.title()
     print(f"   * Standardized to {esg_data['Industry_Sector'].nunique()} unique industries")
     
     print("\n[4] Validating numeric ranges...")
@@ -272,8 +285,8 @@ def aggregate_esg_by_industry(esg_data):
                             'Avg_Environment_Risk', 'Avg_Governance_Risk', 'Avg_Social_Risk',
                             'Avg_Controversy_Score']
     
-    print(f"   ✓ Aggregated {len(esg_industry)} industries with ESG metrics")
-    print(f"   ✓ Total companies represented: {esg_industry['Company_Count'].sum():.0f}")
+    print(f"   [+] Aggregated {len(esg_industry)} industries with ESG metrics")
+    print(f"   [+] Total companies represented: {esg_industry['Company_Count'].sum():.0f}")
     
     return esg_industry
 
@@ -301,14 +314,24 @@ def preprocess_co2_data(co2_data):
     
     print(f"\nInitial dataset shape: {co2_data.shape}")
     
-    # Rename columns for consistency
+    # Rename / create columns for consistency
     print("\n[1] Standardizing column names...")
-    co2_data.rename(columns={'country': 'Country'}, inplace=True)
-    print(f"   Column names standardized")
+
+    # Keep both 'country' (expected by data_integration.integrate_commodity_datasets)
+    # and 'Country' (used in the rest of the pipeline).
+    if 'country' in co2_data.columns and 'Country' not in co2_data.columns:
+        co2_data['Country'] = co2_data['country']
+    elif 'Country' in co2_data.columns and 'country' not in co2_data.columns:
+        co2_data['country'] = co2_data['Country']
+
+    print(f"   Column names standardized (country / Country)")
     
     # Standardize country names
     print("\n[2] Standardizing country names...")
-    co2_data['Country'] = co2_data['Country'].str.strip().str.title()
+    if 'Country' in co2_data.columns:
+        co2_data['Country'] = co2_data['Country'].astype(str).str.strip().str.title()
+        # Keep lowercase 'country' alias aligned for integration module
+        co2_data['country'] = co2_data['Country']
     print(f"   Standardized: {co2_data['Country'].nunique()} unique countries")
     
     # Remove records with missing key columns
@@ -491,4 +514,4 @@ if __name__ == "__main__":
     co2_data.to_csv("data/processed/preprocessed_co2_data.csv", index=False)
     esg_data.to_csv("data/processed/preprocessed_esg_data.csv", index=False)
     esg_industry.to_csv("data/processed/preprocessed_esg_by_industry.csv", index=False)
-    print("✓ Preprocessed datasets saved to data/processed/")
+    print("[SUCCESS] Preprocessed datasets saved to data/processed/")
