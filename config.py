@@ -1,10 +1,3 @@
-"""
-Configuration file for Green Supply Chain Risk Management Project
-
-This file contains all configuration parameters, paths, and settings
-for the project.
-"""
-
 import os
 from pathlib import Path
 
