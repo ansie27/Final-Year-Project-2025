@@ -3,11 +3,13 @@ Main Pipeline Script for Green Supply Chain Risk Management
 
 This script runs the complete analysis pipeline including:
 1. Data preprocessing and integration
-2. Statistical analysis
-3. Machine learning modeling
-4. Fuzzy AHP-TOPSIS-GA supplier ranking
-5. Visualization
-6. Report generation
+2. Feature engineering
+3. Synthetic data generation (with best model selection: CTGAN or TVAE)
+4. Statistical analysis
+5. Machine learning modeling
+6. Fuzzy AHP-TOPSIS-GA supplier ranking
+7. Visualization
+8. Report generation
 """
 
 import sys
@@ -27,7 +29,12 @@ from data_preprocessing import (
     calculate_risk_metrics,
     display_preprocessing_summary
 )
-from data_integration import integrate_datasets, display_integration_summary
+from data_integration import integrate_supplier_dataset, display_integration_summary
+from feature_engineering import (
+    engineer_supplier_features,
+    engineer_commodity_features,
+    display_feature_engineering_summary
+)
 from analysis import (
     calculate_descriptive_statistics,
     calculate_correlation_matrix,
@@ -51,7 +58,8 @@ from reporting import (
     generate_comprehensive_report,
     export_results_to_json
 )
-from fuzzy_ahp_topsis_ga import analyze_supplier_ranking
+from draft_fuzzy_ahp_topsis_ga import analyze_supplier_ranking # change this back later
+from synthetic_data_generation import ModelSelector, generate_synthetic_data
 import config
 
 
@@ -110,6 +118,44 @@ def save_processed_datasets(supplier_data, commodity_data, co2_data, esg_data, e
     print(f"✓ Saved: {config.PROCESSED_DATA_FILES['esg_industry']}")
 
 
+def save_engineered_datasets(supplier_features, commodity_features):
+    """Save engineered datasets."""
+    print("\n" + "="*70)
+    print("SAVING ENGINEERED DATASETS")
+    print("="*70 + "\n")
+    
+    supplier_features.to_csv(
+        str(config.PROCESSED_DATA_DIR / "supplier_dataset_with_features.csv"),
+        index=False
+    )
+    print(f"✓ Saved: supplier_dataset_with_features.csv")
+    
+    commodity_features.to_csv(
+        str(config.PROCESSED_DATA_DIR / "commodity_dataset_with_features.csv"),
+        index=False
+    )
+    print(f"✓ Saved: commodity_dataset_with_features.csv")
+
+
+def save_final_datasets(supplier_with_risk, commodity_features):
+    """Save final integrated datasets."""
+    print("\n" + "="*70)
+    print("SAVING FINAL DATASETS")
+    print("="*70 + "\n")
+    
+    supplier_with_risk.to_csv(
+        str(config.PROCESSED_DATA_DIR / "supplier_dataset_final.csv"),
+        index=False
+    )
+    print(f"✓ Saved: supplier_dataset_final.csv")
+    
+    commodity_features.to_csv(
+        str(config.PROCESSED_DATA_DIR / "commodity_dataset_final.csv"),
+        index=False
+    )
+    print(f"✓ Saved: commodity_dataset_final.csv")
+
+
 def save_integrated_dataset(integrated_data, enhanced_data):
     """Save integrated and enhanced datasets."""
     print("\n" + "="*70)
@@ -126,8 +172,8 @@ def save_integrated_dataset(integrated_data, enhanced_data):
 def main():
     """
     Main pipeline orchestrator.
-    Runs complete analysis including preprocessing, integration, analysis,
-    modeling, Fuzzy AHP-TOPSIS-GA, visualization, and reporting.
+    Runs complete analysis including preprocessing, feature engineering, 
+    integration, analysis, modeling, Fuzzy AHP-TOPSIS-GA, visualization, and reporting.
     """
     print("="*70)
     print("GREEN SUPPLY CHAIN RISK MANAGEMENT - COMPLETE ANALYSIS PIPELINE")
@@ -136,6 +182,11 @@ def main():
     
     # Set random seed
     set_random_seeds(config.RANDOM_SEED)
+    
+    # Initialize variables for synthetic data generation
+    best_models = None
+    supplier_synthetic = None
+    commodity_synthetic = None
     
     # =====================================================================
     # STEP 1: LOAD AND PREPROCESS DATA
@@ -162,32 +213,127 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 2: INTEGRATE DATASETS
+    # STEP 2: FEATURE ENGINEERING
     # =====================================================================
-    print("STEP 2: Integrating Datasets")
+    print("STEP 2: Feature Engineering")
     print("-" * 70)
     
-    integrated_data = integrate_datasets(
-        supplier_data, commodity_data, co2_data, esg_industry
-    )
+    supplier_features = engineer_supplier_features(supplier_data, commodity_data, co2_data, esg_industry)
+    commodity_features = engineer_commodity_features(commodity_data, co2_data, esg_industry)
     
-    # Calculate risk metrics
-    enhanced_data = calculate_risk_metrics(integrated_data)
+    print("✓ Feature engineering completed")
     
-    print("✓ Dataset integration and risk calculation completed")
+    # Display feature engineering summary
+    display_feature_engineering_summary(supplier_features, commodity_features)
     
-    # Save integrated datasets
-    save_integrated_dataset(integrated_data, enhanced_data)
-    
-    # Display integration summary
-    display_integration_summary(integrated_data, enhanced_data)
+    # Save engineered datasets
+    save_engineered_datasets(supplier_features, commodity_features)
     print()
     
     # =====================================================================
-    # STEP 3: STATISTICAL ANALYSIS
+    # STEP 3: SYNTHETIC DATA GENERATION (BEST MODEL SELECTION)
     # =====================================================================
-    print("STEP 3: Performing Statistical Analysis")
+    print("STEP 3: Synthetic Data Generation with Best Model Selection")
     print("-" * 70)
+    
+    # Check if synthetic data generation is enabled in config
+    if hasattr(config, 'SYNTHETIC_DATA_CONFIG') and config.SYNTHETIC_DATA_CONFIG.get('enabled', True):
+        try:
+            # Initialize model selector
+            selector = ModelSelector(output_dir=config.MODEL_SELECTION_DIR)
+            
+            # Check if we should use cached selection
+            use_cached = config.SYNTHETIC_DATA_CONFIG.get('use_cached_selection', True)
+            best_models = None
+            
+            if use_cached:
+                import json
+                summary_path = config.MODEL_SELECTION_DIR / "model_selection_summary.json"
+                if summary_path.exists():
+                    try:
+                        with open(summary_path, 'r') as f:
+                            cached = json.load(f)
+                            if 'supplier' in cached and 'commodity' in cached:
+                                best_models = {
+                                    'supplier': cached['supplier']['best_model'],
+                                    'commodity': cached['commodity']['best_model']
+                                }
+                                print("✓ Using cached model selection results")
+                    except Exception as e:
+                        print(f"⚠ Could not load cached selection: {e}")
+            
+            # If no cached selection, run model comparison
+            if best_models is None:
+                print("Running model comparison (CTGAN vs TVAE)...")
+                best_models = selector.select_models_for_both(
+                    supplier_data=supplier_features,
+                    commodity_data=commodity_features,
+                    supplier_target_col=config.SYNTHETIC_DATA_CONFIG.get('supplier_target_col'),
+                    commodity_target_col=config.SYNTHETIC_DATA_CONFIG.get('commodity_target_col'),
+                    epochs=config.SYNTHETIC_DATA_CONFIG.get('comparison_epochs', 300),
+                    save_results=True
+                )
+            
+            print(f"✓ Selected models - Supplier: {best_models['supplier']}, Commodity: {best_models['commodity']}")
+            
+            # Generate synthetic data using best models
+            print("\nGenerating synthetic data using selected best models...")
+            
+            # Generate synthetic supplier data
+            supplier_synthetic, supplier_generator = generate_synthetic_data(
+                real_data=supplier_features,
+                model_type=best_models['supplier'].lower(),
+                num_rows=len(supplier_features),
+                epochs=config.SYNTHETIC_DATA_CONFIG.get('generation_epochs', 300),
+                save_path=config.SYNTHETIC_DATA_FILES['supplier'] if config.SYNTHETIC_DATA_CONFIG.get('save_synthetic_data', True) else None,
+                save_model=config.SYNTHETIC_DATA_CONFIG.get('save_models', True),
+                model_save_path=config.SYNTHETIC_MODEL_FILES['supplier'] if config.SYNTHETIC_DATA_CONFIG.get('save_models', True) else None
+            )
+            print(f"✓ Generated synthetic supplier data: {supplier_synthetic.shape}")
+            
+            # Generate synthetic commodity data
+            commodity_synthetic, commodity_generator = generate_synthetic_data(
+                real_data=commodity_features,
+                model_type=best_models['commodity'].lower(),
+                num_rows=len(commodity_features),
+                epochs=config.SYNTHETIC_DATA_CONFIG.get('generation_epochs', 300),
+                save_path=config.SYNTHETIC_DATA_FILES['commodity'] if config.SYNTHETIC_DATA_CONFIG.get('save_synthetic_data', True) else None,
+                save_model=config.SYNTHETIC_DATA_CONFIG.get('save_models', True),
+                model_save_path=config.SYNTHETIC_MODEL_FILES['commodity'] if config.SYNTHETIC_DATA_CONFIG.get('save_models', True) else None
+            )
+            print(f"✓ Generated synthetic commodity data: {commodity_synthetic.shape}")
+            
+            print("✓ Synthetic data generation completed")
+            
+        except Exception as e:
+            print(f"⚠ Warning: Synthetic data generation failed: {e}")
+            print("  Continuing with original data...")
+    else:
+        print("Synthetic data generation is disabled in config")
+    print()
+    
+    # =====================================================================
+    # STEP 4: CALCULATE RISK METRICS AND CREATE FINAL DATASETS
+    # =====================================================================
+    print("STEP 4: Calculating Risk Metrics")
+    print("-" * 70)
+    
+    supplier_with_risk = calculate_risk_metrics(supplier_features)
+    
+    print("✓ Risk metrics calculated")
+    
+    # Save final datasets
+    save_final_datasets(supplier_with_risk, commodity_features)
+    print()
+    
+    # =====================================================================
+    # STEP 5: STATISTICAL ANALYSIS
+    # =====================================================================
+    print("STEP 5: Performing Statistical Analysis")
+    print("-" * 70)
+    
+    # Use supplier dataset with risk metrics for analysis
+    enhanced_data = supplier_with_risk.copy()
     
     # Descriptive statistics
     stats = calculate_descriptive_statistics(enhanced_data)
@@ -214,9 +360,9 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 4: MACHINE LEARNING MODELING
+    # STEP 6: MACHINE LEARNING MODELING
     # =====================================================================
-    print("STEP 4: Building Machine Learning Models")
+    print("STEP 6: Building Machine Learning Models")
     print("-" * 70)
     
     # Train risk prediction model
@@ -252,9 +398,9 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 5: FUZZY AHP-TOPSIS-GA SUPPLIER RANKING
+    # STEP 7: FUZZY AHP-TOPSIS-GA SUPPLIER RANKING
     # =====================================================================
-    print("STEP 5: Fuzzy AHP-TOPSIS-GA Supplier Ranking")
+    print("STEP 7: Fuzzy AHP-TOPSIS-GA Supplier Ranking")
     print("-" * 70)
     
     # Filter criteria columns to only those that exist in the data
@@ -293,9 +439,9 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 6: MODEL EVALUATION
+    # STEP 8: MODEL EVALUATION
     # =====================================================================
-    print("STEP 6: Evaluating Models")
+    print("STEP 8: Evaluating Models")
     print("-" * 70)
     
     # Generate evaluation reports
@@ -333,9 +479,9 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 7: VISUALIZATION
+    # STEP 9: VISUALIZATION
     # =====================================================================
-    print("STEP 7: Creating Visualizations")
+    print("STEP 9: Creating Visualizations")
     print("-" * 70)
     
     # Prepare ranking data for visualization
@@ -352,9 +498,9 @@ def main():
     print()
     
     # =====================================================================
-    # STEP 8: REPORT GENERATION
+    # STEP 10: REPORT GENERATION
     # =====================================================================
-    print("STEP 8: Generating Reports")
+    print("STEP 10: Generating Reports")
     print("-" * 70)
     
     # Executive summary
@@ -393,6 +539,8 @@ def main():
     print(f"  - Visualizations: {config.VISUALIZATIONS_DIR}")
     print(f"  - Reports: {config.REPORTS_DIR}")
     print(f"  - Models: {config.MODELS_DIR}")
+    if hasattr(config, 'SYNTHETIC_DATA_DIR'):
+        print(f"  - Synthetic Data: {config.SYNTHETIC_DATA_DIR}")
     print()
     print("Key Results:")
     print(f"  - Total Suppliers Analyzed: {enhanced_data['Supplier_ID'].nunique()}")
@@ -409,10 +557,16 @@ def main():
     print(f"  3. {config.PROCESSED_DATA_DIR}/preprocessed_co2_data.csv")
     print(f"  4. {config.PROCESSED_DATA_DIR}/preprocessed_esg_data.csv")
     print(f"  5. {config.PROCESSED_DATA_DIR}/preprocessed_esg_by_industry.csv")
-    print(f"  6. {config.PROCESSED_DATA_DIR}/integrated_commodity_dataset.csv")
-    print(f"  7. {config.PROCESSED_DATA_DIR}/integrated_dataset_with_risk_metrics.csv")
+    print(f"  6. {config.PROCESSED_DATA_DIR}/supplier_dataset_with_features.csv")
+    print(f"  7. {config.PROCESSED_DATA_DIR}/commodity_dataset_with_features.csv")
+    print(f"  8. {config.PROCESSED_DATA_DIR}/supplier_dataset_final.csv")
+    print(f"  9. {config.PROCESSED_DATA_DIR}/commodity_dataset_final.csv")
     if topsis_results:
-        print(f"  8. {config.PROCESSED_DATA_DIR}/supplier_ranking_topsis.csv")
+        print(f"  10. {config.PROCESSED_DATA_DIR}/supplier_ranking_topsis.csv")
+    if hasattr(config, 'SYNTHETIC_DATA_CONFIG') and config.SYNTHETIC_DATA_CONFIG.get('enabled', True):
+        if best_models:
+            print(f"  11. {config.SYNTHETIC_DATA_FILES['supplier']} (using {best_models['supplier']})")
+            print(f"  12. {config.SYNTHETIC_DATA_FILES['commodity']} (using {best_models['commodity']})")
     print()
     print(f"🔒 Reproducibility Guarantee:")
     print(f"   Random seed fixed to RANDOM_SEED={config.RANDOM_SEED}")

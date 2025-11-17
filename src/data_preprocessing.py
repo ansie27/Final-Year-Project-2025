@@ -196,14 +196,14 @@ def preprocess_esg_data(esg_data):
         'Industry': 'Industry_Sector',
         'Sector': 'Sector_Classification'
     }, inplace=True)
-    print(f"   ✓ Column names standardized")
+    print(f"   * Column names standardized")
     
     # Handle missing values
     print("\n[2] Handling missing values...")
     
     # Remove records with missing key ESG metrics
     esg_data = esg_data.dropna(subset=['Total ESG Risk score'])
-    print(f"   ✓ Removed records with missing ESG Risk Score: {esg_data.shape[0]} records remaining")
+    print(f"   * Removed records with missing ESG Risk Score: {esg_data.shape[0]} records remaining")
     
     # Fill missing individual scores with total score average if available
     score_cols = ['Environment Risk Score', 'Governance Risk Score', 'Social Risk Score']
@@ -223,7 +223,7 @@ def preprocess_esg_data(esg_data):
     print("\n[3] Standardizing Industry_Sector names...")
     # Standardize industry names
     esg_data['Industry_Sector'] = esg_data['Industry_Sector'].str.strip().str.title()
-    print(f"   ✓ Standardized to {esg_data['Industry_Sector'].nunique()} unique industries")
+    print(f"   * Standardized to {esg_data['Industry_Sector'].nunique()} unique industries")
     
     print("\n[4] Validating numeric ranges...")
     # Ensure scores are positive
@@ -232,7 +232,7 @@ def preprocess_esg_data(esg_data):
     for col in numeric_cols:
         if col in esg_data.columns:
             esg_data[col] = esg_data[col].clip(lower=0)
-    print(f"   ✓ Validated numeric ranges")
+    print(f"   * Validated numeric ranges")
     
     print(f"\nFinal dataset shape: {esg_data.shape}")
     print("="*70)

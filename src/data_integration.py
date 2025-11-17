@@ -9,7 +9,7 @@ import numpy as np
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
-def integrate_datasets(supplier_data, commodity_data, co2_data, esg_industry=None):
+def integrate_supplier_dataset(supplier_data, commodity_data, co2_data, esg_industry=None):
     """
     Integrates supplier, commodity (GHG), CO2, and ESG datasets.
     
@@ -198,9 +198,9 @@ if __name__ == "__main__":
     esg_industry = pd.read_csv("data/processed/preprocessed_esg_by_industry.csv")
     
     # Integrate datasets
-    integrated_data = integrate_datasets(supplier_data, commodity_data, co2_data, esg_industry)
+    integrated_data = integrate_supplier_dataset(supplier_data, commodity_data, co2_data, esg_industry)
     
     # Save integrated dataset
     print("\nSaving integrated dataset...")
     integrated_data.to_csv("data/processed/integrated_commodity_dataset.csv", index=False)
-    print("✓ Saved to: data/processed/integrated_commodity_dataset.csv")
+    print("Saved to: data/processed/integrated_commodity_dataset.csv")

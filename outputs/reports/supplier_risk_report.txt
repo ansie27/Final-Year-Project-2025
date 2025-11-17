@@ -2,7 +2,7 @@
 SUPPLIER RISK ASSESSMENT REPORT
 ======================================================================
 
-Report Generated: 2025-11-14 22:42:23
+Report Generated: 2025-11-16 11:36:48
 
 Risk Scores:
   Average Environmental_Risk_Score: -0.70
