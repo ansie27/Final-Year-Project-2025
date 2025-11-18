@@ -1,10 +1,3 @@
-"""
-Model Selector for Synthetic Data Generation
-
-This module compares CTGAN and TVAE models and selects the most efficient one
-for generating synthetic supplier and commodity data.
-"""
-
 import pandas as pd
 import numpy as np
 import json
@@ -12,22 +5,10 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional
 import time
 
-from .comparison import SyntheticDataComparison
+from .dg_comparison import SyntheticDataComparison
 
-
-class ModelSelector:
-    """
-    Selects the most efficient synthetic data generation model (CTGAN or TVAE)
-    for supplier and commodity datasets.
-    """
-    
+class DG_ModelSelector:
     def __init__(self, output_dir: Optional[Path] = None):
-        """
-        Parameters:
-        -----------
-        output_dir : Path, optional
-            Directory to save model selection results
-        """
         self.output_dir = output_dir or Path("outputs/synthetic_data_generation")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -42,27 +23,6 @@ class ModelSelector:
         epochs: int = 300,
         save_results: bool = True
     ) -> str:
-        """
-        Compare CTGAN and TVAE and select the most efficient model.
-        
-        Parameters:
-        -----------
-        real_data : pd.DataFrame
-            Real dataset to use for comparison
-        data_type : str
-            'supplier' or 'commodity'
-        target_col : str, optional
-            Target column for ML utility evaluation
-        epochs : int
-            Number of training epochs for comparison
-        save_results : bool
-            Whether to save comparison results
-            
-        Returns:
-        --------
-        str
-            'CTGAN' or 'TVAE' - the selected best model
-        """
         print(f"\n{'='*70}")
         print(f"MODEL SELECTION FOR {data_type.upper()} DATA".center(70))
         print(f"{'='*70}\n")
@@ -122,29 +82,6 @@ class ModelSelector:
         epochs: int = 300,
         save_results: bool = True
     ) -> Dict[str, str]:
-        """
-        Select best models for both supplier and commodity data.
-        
-        Parameters:
-        -----------
-        supplier_data : pd.DataFrame
-            Supplier dataset
-        commodity_data : pd.DataFrame
-            Commodity dataset
-        supplier_target_col : str, optional
-            Target column for supplier ML utility evaluation
-        commodity_target_col : str, optional
-            Target column for commodity ML utility evaluation
-        epochs : int
-            Number of training epochs
-        save_results : bool
-            Whether to save results
-            
-        Returns:
-        --------
-        Dict[str, str]
-            Dictionary with 'supplier' and 'commodity' keys mapping to best models
-        """
         print(f"\n{'='*70}")
         print("SELECTING BEST MODELS FOR SUPPLIER AND COMMODITY DATA".center(70))
         print(f"{'='*70}\n")
@@ -190,8 +127,3 @@ class ModelSelector:
             'supplier': supplier_model,
             'commodity': commodity_model
         }
-
-
-
-
-

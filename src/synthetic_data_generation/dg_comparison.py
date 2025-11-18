@@ -1,8 +1,3 @@
-"""
-Comparison module for CTGAN vs TVAE synthetic data generation.
-Evaluates statistical similarity and ML utility for supplier and commodity data.
-"""
-
 import pandas as pd
 import numpy as np
 from sdv.single_table import CTGANSynthesizer, TVAESynthesizer
@@ -14,20 +9,8 @@ import seaborn as sns
 from typing import Dict, Tuple, Optional
 import json
 
-class SyntheticDataComparison:
-    """
-    Compare CTGAN and TVAE for generating synthetic supplier and commodity data.
-    """
-    
+class SyntheticDataComparison:    
     def __init__(self, real_data: pd.DataFrame, data_type: str = 'supplier'):
-        """
-        Parameters:
-        -----------
-        real_data : pd.DataFrame
-            Original dataset (supplier or commodity)
-        data_type : str
-            'supplier' or 'commodity' for labeling
-        """
         self.real_data = real_data
         self.data_type = data_type
         self.metadata = None

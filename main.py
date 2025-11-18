@@ -62,11 +62,11 @@ from draft_fuzzy_ahp_topsis_ga import analyze_supplier_ranking # change this bac
 
 # Conditional import for synthetic data generation (requires sdv package)
 try:
-    from synthetic_data_generation import ModelSelector, generate_synthetic_data
+    from synthetic_data_generation import DG_ModelSelector, generate_synthetic_data
     SYNTHETIC_DATA_AVAILABLE = True
 except ImportError:
     SYNTHETIC_DATA_AVAILABLE = False
-    ModelSelector = None
+    DG_ModelSelector = None
     generate_synthetic_data = None
 
 import config
@@ -252,7 +252,7 @@ def main():
     elif hasattr(config, 'SYNTHETIC_DATA_CONFIG') and config.SYNTHETIC_DATA_CONFIG.get('enabled', True):
         try:
             # Initialize model selector
-            selector = ModelSelector(output_dir=config.MODEL_SELECTION_DIR)
+            selector = DG_ModelSelector(output_dir=config.MODEL_SELECTION_DIR)
             
             # Check if we should use cached selection
             use_cached = config.SYNTHETIC_DATA_CONFIG.get('use_cached_selection', True)

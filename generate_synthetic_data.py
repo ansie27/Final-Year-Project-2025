@@ -15,7 +15,7 @@ import numpy as np
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from synthetic_data_generation import ModelSelector, generate_synthetic_data
+from synthetic_data_generation import DG_ModelSelector, generate_synthetic_data
 from data_preprocessing import (
     preprocess_supplier_data,
     preprocess_commodity_data
@@ -52,7 +52,7 @@ def select_best_models(supplier_data, commodity_data):
     print("SELECTING BEST MODELS")
     print("="*70)
     
-    selector = ModelSelector(output_dir=config.MODEL_SELECTION_DIR)
+    selector = DG_ModelSelector(output_dir=config.MODEL_SELECTION_DIR)
     
     # Check if we should use cached selection
     if config.SYNTHETIC_DATA_CONFIG['use_cached_selection']:
