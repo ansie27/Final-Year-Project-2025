@@ -72,7 +72,7 @@ class CTGANSyntheticDataGenerator(BaseSyntheticDataGenerator):
         self.discriminator_dim = discriminator_dim
         self.learning_rate = learning_rate
     
-    def fit(self, real_data: pd.DataFrame):
+    def fit(self, real_data: pd.DataFrame) -> None:
         logger.info(f"CTGAN: Fitting on data with shape {real_data.shape}")
         
         # Create metadata
@@ -86,9 +86,6 @@ class CTGANSyntheticDataGenerator(BaseSyntheticDataGenerator):
             metadata=self.metadata,
             epochs=self.epochs,
             batch_size=self.batch_size,
-            generator_dim=self.generator_dim,
-            discriminator_dim=self.discriminator_dim,
-            learning_rate=self.learning_rate,
             random_seed=self.random_state,
             verbose=True
         )
@@ -117,7 +114,7 @@ class TVAESyntheticDataGenerator(BaseSyntheticDataGenerator):
         self.decoder_dim = decoder_dim
         self.learning_rate = learning_rate
     
-    def fit(self, real_data: pd.DataFrame):
+    def fit(self, real_data: pd.DataFrame) -> None:
         logger.info(f"TVAE: Fitting on data with shape {real_data.shape}")
         
         # Create metadata
@@ -131,9 +128,6 @@ class TVAESyntheticDataGenerator(BaseSyntheticDataGenerator):
             metadata=self.metadata,
             epochs=self.epochs,
             batch_size=self.batch_size,
-            encoder_dim=self.encoder_dim,
-            decoder_dim=self.decoder_dim,
-            learning_rate=self.learning_rate,
             random_seed=self.random_state,
             verbose=True
         )

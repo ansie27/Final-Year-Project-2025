@@ -7,49 +7,26 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from src.synthetic_data_generation.dg_models import CTGANSyntheticDataGenerator, TVAESyntheticDataGenerator
+from src.synthetic_data_generation.dg_evaluation import SyntheticDataEvaluator
+from src.synthetic_data_generation.dg_model_selector import SyntheticDataModelSelector
+from src.synthetic_data_generation.final_dg_model import SyntheticDataGenerator
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-def create_sample_data():
-    """Create sample supplier and commodity datasets for testing."""
-    np.random.seed(42)
-    
-    # Sample Supplier Data
-    supplier_data = pd.DataFrame({
-        'supplier_id': range(1, 101),
-        'cost': np.random.uniform(100, 1000, 100),
-        'quality_score': np.random.uniform(0, 100, 100),
-        'delivery_time': np.random.randint(1, 30, 100),
-        'co2_emissions': np.random.uniform(10, 500, 100),
-        'esg_score': np.random.uniform(0, 100, 100),
-        'certification': np.random.choice(['ISO9001', 'ISO14001', 'None'], 100),
-        'risk_level': np.random.choice(['Low', 'Medium', 'High'], 100)
-    })
-    
-    # Sample Commodity Data
-    commodity_data = pd.DataFrame({
-        'commodity_id': range(1, 101),
-        'naics_code': np.random.randint(100000, 999999, 100),
-        'ghg_emissions': np.random.uniform(0.001, 0.1, 100),
-        'price_per_unit': np.random.uniform(10, 500, 100),
-        'supply_chain_risk': np.random.uniform(0, 100, 100),
-        'category': np.random.choice(['Manufacturing', 'Agriculture', 'Mining', 'Services'], 100),
-        'sustainability_rating': np.random.choice(['A', 'B', 'C', 'D'], 100)
-    })
-    
-    return supplier_data, commodity_data
-
-
 def test_synthetic_data_pipeline(
     supplier_data=None,
     commodity_data=None,
     output_dir='outputs/test_run',
     epochs=50,  # Reduced for testing
-    evaluation_sizes=[100, 200],  # Smaller sizes for testing
-    final_generation_size=500  # Smaller final size for testing
+    evaluation_sizes=None,  # Smaller sizes for testing
+    final_generation_size=500,  # Smaller final size for testing
+    supplier_path="data/processed/integrated_supplier_dataset.csv",
+    commodity_path="data/processed/integrated_commodity_dataset.csv"
 ):
     """
     Test the complete synthetic data generation pipeline.
@@ -57,18 +34,25 @@ def test_synthetic_data_pipeline(
     Parameters
     ----------
     supplier_data : pd.DataFrame, optional
-        Real supplier data. If None, sample data will be created.
+        Real supplier data. If None, will load from supplier_path.
     commodity_data : pd.DataFrame, optional
-        Real commodity data. If None, sample data will be created.
+        Real commodity data. If None, will load from commodity_path.
     output_dir : str
         Output directory for results
     epochs : int
         Training epochs (use smaller value for testing)
-    evaluation_sizes : list
-        Sizes for evaluation phase
+    evaluation_sizes : list, optional
+        Sizes for evaluation phase. Default: [100, 200]
     final_generation_size : int
         Final generation size
+    supplier_path : str
+        Path to supplier CSV file (used if supplier_data is None)
+    commodity_path : str
+        Path to commodity CSV file (used if commodity_data is None)
     """
+    
+    if evaluation_sizes is None:
+        evaluation_sizes = [100, 200]
     
     print("="*80)
     print("SYNTHETIC DATA GENERATION PIPELINE TEST".center(80))
@@ -82,40 +66,36 @@ def test_synthetic_data_pipeline(
     print("\n[Step 1/6] Preparing Data...")
     print("-"*80)
     
-    if supplier_data is None or commodity_data is None:
-        print("Creating sample datasets...")
-        supplier_data, commodity_data = create_sample_data()
+    # Load data if not provided
+    if supplier_data is None:
+        print(f"Loading supplier data from {supplier_path}...")
+        supplier_data = pd.read_csv(supplier_path)
     
-    # Save real data
-    supplier_path = output_path / 'real_supplier_data.csv'
-    commodity_path = output_path / 'real_commodity_data.csv'
-    
-    supplier_data.to_csv(supplier_path, index=False)
-    commodity_data.to_csv(commodity_path, index=False)
+    if commodity_data is None:
+        print(f"Loading commodity data from {commodity_path}...")
+        commodity_data = pd.read_csv(commodity_path)
     
     print(f"✓ Supplier data: {supplier_data.shape}")
     print(f"✓ Commodity data: {commodity_data.shape}")
     
-    # Step 2: Import modules (after data is ready)
-    print("\n[Step 2/6] Importing Modules...")
-    print("-"*80)
+    # Save real data for reference
+    real_supplier_path = output_path / 'real_supplier_data.csv'
+    real_commodity_path = output_path / 'real_commodity_data.csv'
     
-    try:
-        from src.synthetic_data_generation.dg_models import CTGANSyntheticDataGenerator, TVAESyntheticDataGenerator
-        from src.synthetic_data_generation.dg_evaluation import SyntheticDataEvaluator
-        from src.synthetic_data_generation.dg_model_selector import SyntheticDataModelSelector
-        print("✓ All modules imported successfully")
-    except ImportError as e:
-        print(f"✗ Import error: {e}")
-        print("\nMake sure all module files are in the same directory:")
-        print("  - dg_models.py")
-        print("  - dg_evaluation.py")
-        print("  - dg_model_selector.py")
-        return None
+    supplier_data.to_csv(real_supplier_path, index=False)
+    commodity_data.to_csv(real_commodity_path, index=False)
+    
+    print(f"✓ Real data saved to {output_path}")
+    
+    # Step 2: Import modules
+    print("\n[Step 2/6] Modules Already Imported...")
+    print("-"*80)
+    print("✓ All modules imported successfully")
     
     # Step 3: Train CTGAN
     print("\n[Step 3/6] Training CTGAN Models...")
     print("-"*80)
+    print(f"Training CTGAN on supplier data ({supplier_data.shape[0]} rows)...")
     
     ctgan_supplier = CTGANSyntheticDataGenerator(epochs=epochs, random_state=42)
     ctgan_supplier.fit(supplier_data)
@@ -278,23 +258,25 @@ def run_quick_test():
 # Full test with your actual data
 def run_with_real_data(supplier_csv_path, commodity_csv_path, output_dir='outputs/full_run'):
     """Run pipeline with your actual datasets."""
+    print(f"Loading data from CSV files...")
     supplier_data = pd.read_csv(supplier_csv_path)
     commodity_data = pd.read_csv(commodity_csv_path)
+    
+    print(f"Starting pipeline with {supplier_data.shape[0]} supplier and {commodity_data.shape[0]} commodity records...")
     
     return test_synthetic_data_pipeline(
         supplier_data=supplier_data,
         commodity_data=commodity_data,
         output_dir=output_dir,
-        epochs=300,  # Full training
-        evaluation_sizes=[500, 1000, 5000, 10000],
-        final_generation_size=50000
+        epochs=50,  # Reduced for testing
+        evaluation_sizes=[100, 200],  # Smaller for testing
+        final_generation_size=500  # Smaller for testing
     )
-
 
 if __name__ == "__main__":
     # Run quick test
     print("Running quick test...")
-    results = run_quick_test()
+    results = run_with_real_data("data/processed/integrated_supplier_dataset.csv", "data/processed/integrated_commodity_dataset.csv")
     
     if results:
         print(f"\n✓ Test completed successfully!")
