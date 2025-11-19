@@ -20,18 +20,6 @@ class BaseSyntheticDataGenerator:
     """Base class for synthetic data generators."""
     
     def __init__(self, model_name: str, epochs: int = DEFAULT_EPOCHS, random_state: int = RANDOM_SEED):
-        """
-        Initialize base synthetic data generator.
-        
-        Parameters
-        ----------
-        model_name : str
-            Name of the model (e.g., 'CTGAN', 'TVAE')
-        epochs : int
-            Number of training epochs
-        random_state : int
-            Random seed for reproducibility
-        """
         self.model_name = model_name
         self.epochs = epochs
         self.random_state = random_state
@@ -42,30 +30,9 @@ class BaseSyntheticDataGenerator:
         logger.info(f"Initialized {self.model_name} generator (epochs={epochs})")
     
     def fit(self, real_data: pd.DataFrame):
-        """
-        Fit the synthetic data generator on real data.
-        
-        Parameters
-        ----------
-        real_data : pd.DataFrame
-            Real dataset to learn from
-        """
         raise NotImplementedError("Subclasses must implement fit() method")
     
     def generate(self, num_rows: int) -> pd.DataFrame:
-        """
-        Generate synthetic data.
-        
-        Parameters
-        ----------
-        num_rows : int
-            Number of synthetic rows to generate
-            
-        Returns
-        -------
-        pd.DataFrame
-            Generated synthetic data
-        """
         if not self.is_fitted:
             raise RuntimeError(f"{self.model_name} must be fitted before generating data")
         
@@ -76,19 +43,6 @@ class BaseSyntheticDataGenerator:
         return synthetic_data
     
     def generate_multiple_sizes(self, sizes: list = None) -> Dict[int, pd.DataFrame]:
-        """
-        Generate synthetic data at multiple sizes.
-        
-        Parameters
-        ----------
-        sizes : list, optional
-            List of sizes to generate. Defaults to [500, 1000, 5000, 10000]
-            
-        Returns
-        -------
-        dict
-            Dictionary mapping size to generated DataFrame
-        """
         if sizes is None:
             sizes = SYNTHETIC_DATA_SIZES
         
@@ -102,15 +56,6 @@ class BaseSyntheticDataGenerator:
 
 
 class CTGANSyntheticDataGenerator(BaseSyntheticDataGenerator):
-    """
-    CTGAN (Conditional Tabular GAN) Synthetic Data Generator
-    
-    CTGAN is designed for generating synthetic tabular data with:
-    - Better handling of categorical and mixed-type data
-    - Mode coverage - captures rare modes in data
-    - Addresses class imbalance issues
-    """
-    
     def __init__(
         self,
         epochs: int = DEFAULT_EPOCHS,
@@ -120,24 +65,6 @@ class CTGANSyntheticDataGenerator(BaseSyntheticDataGenerator):
         learning_rate: float = 2e-4,
         random_state: int = RANDOM_SEED
     ):
-        """
-        Initialize CTGAN generator.
-        
-        Parameters
-        ----------
-        epochs : int
-            Number of training epochs
-        batch_size : int
-            Batch size for training
-        generator_dim : tuple
-            Architecture of generator layers
-        discriminator_dim : tuple
-            Architecture of discriminator layers
-        learning_rate : float
-            Learning rate for training
-        random_state : int
-            Random seed
-        """
         super().__init__('CTGAN', epochs, random_state)
         
         self.batch_size = batch_size
@@ -146,14 +73,6 @@ class CTGANSyntheticDataGenerator(BaseSyntheticDataGenerator):
         self.learning_rate = learning_rate
     
     def fit(self, real_data: pd.DataFrame):
-        """
-        Fit CTGAN on real data.
-        
-        Parameters
-        ----------
-        real_data : pd.DataFrame
-            Real dataset to learn from
-        """
         logger.info(f"CTGAN: Fitting on data with shape {real_data.shape}")
         
         # Create metadata
@@ -182,15 +101,6 @@ class CTGANSyntheticDataGenerator(BaseSyntheticDataGenerator):
 
 
 class TVAESyntheticDataGenerator(BaseSyntheticDataGenerator):
-    """
-    TVAE (Tabular Variational Auto-Encoder) Synthetic Data Generator
-    
-    TVAE is designed for generating synthetic tabular data with:
-    - Variational auto-encoder architecture for better generalization
-    - Effective handling of mixed data types
-    - Better privacy preservation compared to GANs
-    """
-    
     def __init__(
         self,
         epochs: int = DEFAULT_EPOCHS,
@@ -200,24 +110,6 @@ class TVAESyntheticDataGenerator(BaseSyntheticDataGenerator):
         learning_rate: float = 1e-3,
         random_state: int = RANDOM_SEED
     ):
-        """
-        Initialize TVAE generator.
-        
-        Parameters
-        ----------
-        epochs : int
-            Number of training epochs
-        batch_size : int
-            Batch size for training
-        encoder_dim : tuple
-            Architecture of encoder layers
-        decoder_dim : tuple
-            Architecture of decoder layers
-        learning_rate : float
-            Learning rate for training
-        random_state : int
-            Random seed
-        """
         super().__init__('TVAE', epochs, random_state)
         
         self.batch_size = batch_size
@@ -226,14 +118,6 @@ class TVAESyntheticDataGenerator(BaseSyntheticDataGenerator):
         self.learning_rate = learning_rate
     
     def fit(self, real_data: pd.DataFrame):
-        """
-        Fit TVAE on real data.
-        
-        Parameters
-        ----------
-        real_data : pd.DataFrame
-            Real dataset to learn from
-        """
         logger.info(f"TVAE: Fitting on data with shape {real_data.shape}")
         
         # Create metadata
@@ -262,12 +146,6 @@ class TVAESyntheticDataGenerator(BaseSyntheticDataGenerator):
 
 
 class SyntheticDataGenerationPipeline:
-    """
-    Pipeline for generating synthetic data using CTGAN and TVAE models.
-    
-    Generates synthetic data at multiple sizes (500, 1000, 5000, 10000 rows)
-    from integrated supplier and commodity datasets.
-    """
     
     def __init__(
         self,
@@ -276,20 +154,6 @@ class SyntheticDataGenerationPipeline:
         random_state: int = RANDOM_SEED,
         output_dir: Optional[str] = None
     ):
-        """
-        Initialize the pipeline.
-        
-        Parameters
-        ----------
-        ctgan_epochs : int
-            Number of epochs for CTGAN training
-        tvae_epochs : int
-            Number of epochs for TVAE training
-        random_state : int
-            Random seed
-        output_dir : str, optional
-            Directory to save generated synthetic data
-        """
         self.ctgan_generator = CTGANSyntheticDataGenerator(epochs=ctgan_epochs, random_state=random_state)
         self.tvae_generator = TVAESyntheticDataGenerator(epochs=tvae_epochs, random_state=random_state)
         self.output_dir = output_dir
@@ -298,14 +162,6 @@ class SyntheticDataGenerationPipeline:
         logger.info(f"Initialized SyntheticDataGenerationPipeline (output_dir={output_dir})")
     
     def fit_models(self, real_data: pd.DataFrame):
-        """
-        Fit both CTGAN and TVAE models on real data.
-        
-        Parameters
-        ----------
-        real_data : pd.DataFrame
-            Real integrated dataset (without preprocessing)
-        """
         logger.info("Pipeline: Fitting CTGAN and TVAE models...")
         logger.info(f"Pipeline: Real data shape: {real_data.shape}")
         
@@ -319,21 +175,7 @@ class SyntheticDataGenerationPipeline:
         sizes: list = None,
         save_to_file: bool = True
     ) -> Dict[str, Dict[int, pd.DataFrame]]:
-        """
-        Generate synthetic data using both models at multiple sizes.
-        
-        Parameters
-        ----------
-        sizes : list, optional
-            List of sizes to generate. Defaults to [500, 1000, 5000, 10000]
-        save_to_file : bool
-            Whether to save generated data to CSV files
-            
-        Returns
-        -------
-        dict
-            Dictionary structure: {model_name: {size: DataFrame}}
-        """
+
         if sizes is None:
             sizes = SYNTHETIC_DATA_SIZES
         
@@ -358,14 +200,6 @@ class SyntheticDataGenerationPipeline:
         return self.generated_data
     
     def _save_generated_data(self, sizes: list):
-        """
-        Save generated synthetic data to CSV files.
-        
-        Parameters
-        ----------
-        sizes : list
-            Sizes that were generated
-        """
         output_path = Path(self.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
@@ -380,14 +214,6 @@ class SyntheticDataGenerationPipeline:
                 logger.info(f"Pipeline: Saved {filename} ({len(data)} rows)")
     
     def get_summary_statistics(self) -> Dict:
-        """
-        Get summary statistics of generated data.
-        
-        Returns
-        -------
-        dict
-            Summary statistics for all generated datasets
-        """
         summary = {}
         
         for model_name, model_data in self.generated_data.items():
@@ -411,29 +237,7 @@ def generate_synthetic_data_comparison(
     tvae_epochs: int = DEFAULT_EPOCHS,
     random_state: int = RANDOM_SEED
 ) -> Tuple[Dict[str, Dict[int, pd.DataFrame]], Dict]:
-    """
-    Convenience function to generate synthetic data using both CTGAN and TVAE models.
-    
-    Parameters
-    ----------
-    real_data : pd.DataFrame
-        Real integrated dataset (without preprocessing)
-    sizes : list, optional
-        Sizes to generate. Defaults to [500, 1000, 5000, 10000]
-    output_dir : str, optional
-        Directory to save results
-    ctgan_epochs : int
-        CTGAN training epochs
-    tvae_epochs : int
-        TVAE training epochs
-    random_state : int
-        Random seed
-        
-    Returns
-    -------
-    tuple
-        (generated_data_dict, summary_statistics)
-    """
+
     if sizes is None:
         sizes = SYNTHETIC_DATA_SIZES
     
@@ -455,8 +259,3 @@ def generate_synthetic_data_comparison(
     summary = pipeline.get_summary_statistics()
     
     return generated_data, summary
-
-
-
-    
-
