@@ -1,6 +1,11 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import sys
+from pathlib import Path as PathlibPath
+
+# Parent directory
+sys.path.insert(0, str(PathlibPath(__file__).parent.parent))
 import config
 
 # Set random seed for reproducibility
@@ -309,7 +314,7 @@ def integrate_datasets(
     # Load data if not provided
     if supplier_data is None or commodity_data is None or co2_data is None or esg_data is None:
         print("\n[Loading data from config paths...]")
-        from src.data_preprocessing import (
+        from data_preprocessing import (
             preprocess_supplier_data,
             preprocess_commodity_data,
             preprocess_co2_data,
@@ -433,7 +438,7 @@ if __name__ == "__main__":
     print("="*70)
     
     # Load and preprocess data
-    from src.data_preprocessing import (
+    from data_preprocessing import (
         preprocess_supplier_data,
         preprocess_commodity_data,
         preprocess_co2_data,
