@@ -31,6 +31,11 @@ metrics:
     accuracy: 0.82025
     balanced_accuracy: 0.7641582419918809
     f1_macro: 0.8042409372646162
+    matthews_corrcoef: 0.6473997948617732
+    roc_auc_macro: 0.9171651869254864
+    precision_at_k: 0.44
+    recall_at_k: 0.8661417322834646
+    top_k: 500.0
 history:
   train:
     mlogloss:
@@ -638,3 +643,8 @@ feature_names:
 - Industry_Sector_Food & Beverage
 - Industry_Sector_Metals
 best_iteration: 258
+evaluation:
+  roc_curve_file: C:\Final-Year-Project-2025\outputs\models\roc_data\xgboost_roc.npz
+  roc_plot_path: C:\Final-Year-Project-2025\outputs\visualizations\ROC_AUC_3Models.png
+  positive_class: High
+  top_k: '500'

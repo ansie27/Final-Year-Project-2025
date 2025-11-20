@@ -27,6 +27,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import config
 
+if str(PROJECT_ROOT / "utils") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "utils"))
+
+from model_evaluation_utils import (
+    ensure_probability_matrix,
+    evaluate_classification_metrics,
+)
+
 DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "xgboost_results.yaml"
 DEFAULT_TARGET = "Risk_Classification"
@@ -37,6 +45,7 @@ IDENTIFIER_COLUMNS = [
     "Supplier_Name",
     "Commodity_Name",
 ]
+MODEL_LABEL = "XGBoost"
 
 
 def set_random_seed(seed: Optional[int] = None) -> None:
@@ -303,6 +312,8 @@ def main() -> None:
     parser.add_argument("--reg-lambda", type=float, default=1.0, help="L2 regularization term on weights.")
     parser.add_argument("--gamma", type=float, default=0.0, help="Minimum loss reduction required to make a further partition.")
     parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel threads used to run XGBoost.")
+    parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
+    parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
     args = parser.parse_args()
 
     set_random_seed(config.RANDOM_SEED)
@@ -336,6 +347,20 @@ def main() -> None:
         gamma=args.gamma,
         n_jobs=args.n_jobs,
     )
+    evaluation_details = None
+    if bundle.task_type == "classification":
+        test_dmatrix = xgb.DMatrix(bundle.X_test, label=bundle.y_test, feature_names=bundle.feature_names)
+        probabilities_raw = booster.predict(test_dmatrix)
+        probabilities = ensure_probability_matrix(probabilities_raw, bundle.n_classes)
+        extra_metrics, evaluation_details = evaluate_classification_metrics(
+            MODEL_LABEL,
+            bundle.y_test,
+            probabilities,
+            bundle.class_names,
+            args.positive_class,
+            args.top_k,
+        )
+        test_metrics.update(extra_metrics)
 
     payload: Dict[str, Any] = {
         "dataset": {
@@ -369,6 +394,8 @@ def main() -> None:
         "feature_names": bundle.feature_names,
         "best_iteration": booster.best_iteration,
     }
+    if evaluation_details:
+        payload["evaluation"] = evaluation_details
 
     save_results_yaml(args.output_path, payload)
     print(f"[+] XGBoost training complete. Results saved to {args.output_path}")

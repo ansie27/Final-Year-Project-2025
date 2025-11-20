@@ -24,6 +24,11 @@ metrics:
   accuracy: 0.81525
   balanced_accuracy: 0.7720178915106327
   f1_macro: 0.7997980861060242
+  matthews_corrcoef: 0.63971828524856
+  roc_auc_macro: 0.9062073337195716
+  precision_at_k: 0.424
+  recall_at_k: 0.8346456692913385
+  top_k: 500.0
 history:
   accuracy:
   - 0.6472142934799194
@@ -178,3 +183,8 @@ feature_names:
 - Industry_Sector_Electronics
 - Industry_Sector_Food & Beverage
 - Industry_Sector_Metals
+evaluation:
+  roc_curve_file: C:\Final-Year-Project-2025\outputs\models\roc_data\ann_roc.npz
+  roc_plot_path: C:\Final-Year-Project-2025\outputs\visualizations\ROC_AUC_3Models.png
+  positive_class: High
+  top_k: '500'

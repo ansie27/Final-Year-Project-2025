@@ -27,6 +27,14 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+utils_path = PROJECT_ROOT / "utils"
+if str(utils_path) not in sys.path:
+    sys.path.insert(0, str(utils_path))
+
+from model_evaluation_utils import (
+    ensure_probability_matrix,
+    evaluate_classification_metrics,
+)
 
 import config
 DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
@@ -39,6 +47,7 @@ IDENTIFIER_COLUMNS = [
     "Supplier_Name",
     "Commodity_Name",
 ]
+MODEL_LABEL = "ANN"
 
 
 def set_random_seeds(seed: Optional[int] = None) -> None:
@@ -457,6 +466,8 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=150, help="Maximum training epochs.")
     parser.add_argument("--batch-size", type=int, default=128, help="Mini-batch size.")
     parser.add_argument("--patience", type=int, default=15, help="Early stopping patience.")
+    parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
+    parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
     args = parser.parse_args()
 
     backend = args.backend
@@ -517,6 +528,18 @@ def main() -> None:
         y_pred=raw_predictions,
         n_classes=bundle.n_classes,
     )
+    evaluation_details = None
+    if bundle.task_type == "classification":
+        probabilities = ensure_probability_matrix(raw_predictions, bundle.n_classes)
+        extra_metrics, evaluation_details = evaluate_classification_metrics(
+            MODEL_LABEL,
+            bundle.y_test,
+            probabilities,
+            bundle.class_names,
+            args.positive_class,
+            args.top_k,
+        )
+        metrics.update(extra_metrics)
 
     payload: Dict[str, Any] = {
         "dataset": {
@@ -541,6 +564,8 @@ def main() -> None:
         "history": serialize_history(history),
         "feature_names": bundle.feature_names,
     }
+    if evaluation_details:
+        payload["evaluation"] = evaluation_details
 
     save_results_yaml(args.output_path, payload)
     print(f"[+] ANN training complete. Results saved to {args.output_path}")
