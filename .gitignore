@@ -27,7 +27,3 @@ Thumbs.db
 
 # VS Code
 .vscode/
-
-# Datasets and PDFs
-*.csv
-*.pdf
