@@ -8,7 +8,6 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import yaml
-import config
 import tensorflow as tf
 from tensorflow import keras
 import torch
@@ -26,10 +25,20 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import config
 DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "ann_results.yaml"
-DEFAULT_TARGET = "Overall_Risk_Score"
+DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
+IDENTIFIER_COLUMNS = [
+    "Supplier_ID",
+    "Commodity_ID",
+    "Supplier_Name",
+    "Commodity_Name",
+]
 
 
 def set_random_seeds(seed: Optional[int] = None) -> None:
@@ -68,7 +77,9 @@ def prepare_features(
     if target_column not in df.columns:
         raise ValueError(f"Target column '{target_column}' not found in dataset")
 
-    drop_columns = [target_column] + [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_from_config = [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_identifiers = [col for col in IDENTIFIER_COLUMNS if col in df.columns and col != target_column]
+    drop_columns = [target_column] + exclude_from_config + exclude_identifiers
     features = df.drop(columns=drop_columns, errors="ignore").copy()
     if features.shape[1] == 0:
         raise ValueError("No feature columns remain after applying exclusion rules.")

@@ -28,8 +28,14 @@ import config
 
 DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "random_forest_results.yaml"
-DEFAULT_TARGET = "Overall_Risk_Score"
+DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
+IDENTIFIER_COLUMNS = [
+    "Supplier_ID",
+    "Commodity_ID",
+    "Supplier_Name",
+    "Commodity_Name",
+]
 
 
 def set_random_seed(seed: Optional[int] = None) -> None:
@@ -60,7 +66,9 @@ def prepare_features(df: pd.DataFrame, target_column: str) -> Tuple[pd.DataFrame
     if target_column not in df.columns:
         raise ValueError(f"Target column '{target_column}' not found in dataset")
 
-    drop_columns = [target_column] + [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_from_config = [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_identifiers = [col for col in IDENTIFIER_COLUMNS if col in df.columns and col != target_column]
+    drop_columns = [target_column] + exclude_from_config + exclude_identifiers
     features = df.drop(columns=drop_columns, errors="ignore").copy()
     if features.shape[1] == 0:
         raise ValueError("No feature columns remain after applying exclusion rules.")

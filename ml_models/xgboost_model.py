@@ -29,8 +29,14 @@ import config
 
 DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "xgboost_results.yaml"
-DEFAULT_TARGET = "Overall_Risk_Score"
+DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
+IDENTIFIER_COLUMNS = [
+    "Supplier_ID",
+    "Commodity_ID",
+    "Supplier_Name",
+    "Commodity_Name",
+]
 
 
 def set_random_seed(seed: Optional[int] = None) -> None:
@@ -61,7 +67,9 @@ def prepare_features(df: pd.DataFrame, target_column: str) -> Tuple[pd.DataFrame
     if target_column not in df.columns:
         raise ValueError(f"Target column '{target_column}' not found in dataset")
 
-    drop_columns = [target_column] + [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_from_config = [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_identifiers = [col for col in IDENTIFIER_COLUMNS if col in df.columns and col != target_column]
+    drop_columns = [target_column] + exclude_from_config + exclude_identifiers
     features = df.drop(columns=drop_columns, errors="ignore").copy()
     if features.shape[1] == 0:
         raise ValueError("No feature columns remain after applying exclusion rules.")
@@ -260,10 +268,23 @@ def train_xgboost(
     return booster, evals_result, val_metrics, test_metrics
 
 
+def _to_builtin(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _to_builtin(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_builtin(v) for v in obj]
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, np.generic):
+        return obj.item()
+    return obj
+
+
 def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    serializable_payload = _to_builtin(payload)
     with open(output_path, "w", encoding="utf-8") as handle:
-        yaml.safe_dump(payload, handle, sort_keys=False)
+        yaml.safe_dump(serializable_payload, handle, sort_keys=False)
 
 
 def main() -> None:
@@ -355,4 +376,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
