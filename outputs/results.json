@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "generated_at": "2025-11-17T19:34:25.753889",
+    "total_records": 5000,
+    "total_suppliers": 5000
+  },
+  "summary_statistics": {
+    "overall_risk": {
+      "mean": 27.814811626666668,
+      "median": 30.896733333333334,
+      "std": 27.127644750014273,
+      "min": -165.83853333333332,
+      "max": 66.32491666666667
+    },
+    "risk_classification": {
+      "Medium": 2621,
+      "Low": 2371,
+      "High": 8
+    }
+  }
+}

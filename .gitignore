@@ -8,7 +8,6 @@ ENV/
 *.cache
 *.bak
 *.pth
-*.json
 
 # Python
 __pycache__/

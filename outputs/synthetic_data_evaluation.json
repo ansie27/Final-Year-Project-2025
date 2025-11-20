@@ -1,0 +1,242 @@
+[
+  {
+    "dataset": "CTGAN_10000_data.csv",
+    "model_type": "CTGAN",
+    "rows": 10000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.120999376114082,
+        "chi_square": 336.5193732919744,
+        "js_divergence": 0.18783334495156875
+      },
+      "correlation": {
+        "pearson_diff": 0.027561562960685848,
+        "spearman_diff": 0.028038689997035047
+      },
+      "distribution": {
+        "wasserstein": 148.88572096590437,
+        "mse": 289022.42881540494
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8546078431372549,
+        "trts_accuracy": 0.7545
+      }
+    }
+  },
+  {
+    "dataset": "CTGAN_1000_data.csv",
+    "model_type": "CTGAN",
+    "rows": 1000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.12084402852049912,
+        "chi_square": 3000327.966118321,
+        "js_divergence": 0.19505259802704547
+      },
+      "correlation": {
+        "pearson_diff": 0.03823410346187078,
+        "spearman_diff": 0.03907334767005329
+      },
+      "distribution": {
+        "wasserstein": 136.840976252492,
+        "mse": 223092.85231189243
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8402941176470589,
+        "trts_accuracy": 0.758
+      }
+    }
+  },
+  {
+    "dataset": "CTGAN_50000_data.csv",
+    "model_type": "CTGAN",
+    "rows": 50000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.12067593582887702,
+        "chi_square": 326.67240816618363,
+        "js_divergence": 0.18531149432449895
+      },
+      "correlation": {
+        "pearson_diff": 0.027538203613873907,
+        "spearman_diff": 0.028075917052042935
+      },
+      "distribution": {
+        "wasserstein": 136.67052811851076,
+        "mse": 231574.16588760223
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8595098039215686,
+        "trts_accuracy": 0.75824
+      }
+    }
+  },
+  {
+    "dataset": "CTGAN_5000_data.csv",
+    "model_type": "CTGAN",
+    "rows": 5000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.12109679144385029,
+        "chi_square": 344.5903944792892,
+        "js_divergence": 0.18768590391705198
+      },
+      "correlation": {
+        "pearson_diff": 0.03053773266810943,
+        "spearman_diff": 0.03114482429507735
+      },
+      "distribution": {
+        "wasserstein": 130.89592270159525,
+        "mse": 214748.3094661434
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8622549019607844,
+        "trts_accuracy": 0.7624
+      }
+    }
+  },
+  {
+    "dataset": "CTGAN_500_data.csv",
+    "model_type": "CTGAN",
+    "rows": 500,
+    "metrics": {
+      "statistical": {
+        "ks": 0.12942245989304813,
+        "chi_square": 1333712.909885247,
+        "js_divergence": 0.20662616764185407
+      },
+      "correlation": {
+        "pearson_diff": 0.047598954003274706,
+        "spearman_diff": 0.0474159740043429
+      },
+      "distribution": {
+        "wasserstein": 156.21671797904517,
+        "mse": 330256.559944885
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8312745098039216,
+        "trts_accuracy": 0.742
+      }
+    }
+  },
+  {
+    "dataset": "TVAE_10000_data.csv",
+    "model_type": "TVAE",
+    "rows": 10000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.2282555258467023,
+        "chi_square": 1569135333336.987,
+        "js_divergence": 0.31234715970436583
+      },
+      "correlation": {
+        "pearson_diff": 0.0963743543768209,
+        "spearman_diff": 0.094312540323481
+      },
+      "distribution": {
+        "wasserstein": 231.17797655368304,
+        "mse": 459171.1704643848
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8970588235294118,
+        "trts_accuracy": 0.9022
+      }
+    }
+  },
+  {
+    "dataset": "TVAE_1000_data.csv",
+    "model_type": "TVAE",
+    "rows": 1000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.23732620320855613,
+        "chi_square": 1569135333145.5442,
+        "js_divergence": 0.3254944563307704
+      },
+      "correlation": {
+        "pearson_diff": 0.1009580181958022,
+        "spearman_diff": 0.09817112512973725
+      },
+      "distribution": {
+        "wasserstein": 259.5484246458135,
+        "mse": 542147.6908846219
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8602941176470589,
+        "trts_accuracy": 0.896
+      }
+    }
+  },
+  {
+    "dataset": "TVAE_50000_data.csv",
+    "model_type": "TVAE",
+    "rows": 50000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.22754023172905527,
+        "chi_square": 1569135333271.5906,
+        "js_divergence": 0.31178670937792946
+      },
+      "correlation": {
+        "pearson_diff": 0.09489831097318487,
+        "spearman_diff": 0.09378660417256447
+      },
+      "distribution": {
+        "wasserstein": 231.5850689110832,
+        "mse": 465917.21761469595
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.9012745098039215,
+        "trts_accuracy": 0.89772
+      }
+    }
+  },
+  {
+    "dataset": "TVAE_5000_data.csv",
+    "model_type": "TVAE",
+    "rows": 5000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.23110142602495543,
+        "chi_square": 1569135333230.6584,
+        "js_divergence": 0.31722755563225946
+      },
+      "correlation": {
+        "pearson_diff": 0.09586535332225252,
+        "spearman_diff": 0.09503133090378531
+      },
+      "distribution": {
+        "wasserstein": 213.8427294460021,
+        "mse": 375334.62968679913
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8868627450980392,
+        "trts_accuracy": 0.8894
+      }
+    }
+  },
+  {
+    "dataset": "TVAE_500_data.csv",
+    "model_type": "TVAE",
+    "rows": 500,
+    "metrics": {
+      "statistical": {
+        "ks": 0.23769607843137253,
+        "chi_square": 1569135333548.8428,
+        "js_divergence": 0.33721776565233325
+      },
+      "correlation": {
+        "pearson_diff": 0.10361230617517755,
+        "spearman_diff": 0.10110567835413233
+      },
+      "distribution": {
+        "wasserstein": 219.81919379262473,
+        "mse": 363626.746361494
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.8535294117647059,
+        "trts_accuracy": 0.878
+      }
+    }
+  }
+]
