@@ -1,0 +1,198 @@
+dataset:
+  path: C:\Final-Year-Project-2025\data\processed\syn_20000_engineered_features.csv
+  num_rows: 20000
+  num_features: 52
+  target_column: Risk_Classification
+  task_type: classification
+  class_names:
+  - High
+  - Low
+  - Moderate
+training:
+  model: RandomForestClassifier
+  n_estimators: 300
+  max_depth: null
+  min_samples_split: 2
+  min_samples_leaf: 1
+  max_features: sqrt
+  n_jobs: -1
+  random_seed: 42
+  test_size: 0.2
+  val_size: 0.1
+metrics:
+  validation:
+    accuracy: 0.8055
+    balanced_accuracy: 0.7390585236318081
+    f1_macro: 0.783736800262074
+  test:
+    accuracy: 0.812
+    balanced_accuracy: 0.7408167894012386
+    f1_macro: 0.7872775935479082
+    matthews_corrcoef: 0.630135281216554
+    roc_auc_macro: 0.9113665714513542
+    precision_at_k: 0.444
+    recall_at_k: 0.8740157480314961
+    top_k: 500.0
+feature_importance:
+- feature: ESG_Score
+  importance: 0.2039376042729987
+- feature: Environmental_Score
+  importance: 0.09005486970312916
+- feature: Social_Score
+  importance: 0.08764274977860322
+- feature: Governance_Score
+  importance: 0.08145534972207268
+- feature: ESG_Compliance_Composite
+  importance: 0.04863716799818393
+- feature: Social_Responsibility_Score
+  importance: 0.04654105681361062
+- feature: Regional_Risk_Index
+  importance: 0.02628455519304508
+- feature: Defect_Rate
+  importance: 0.018411243100294912
+- feature: Incident_History_Count
+  importance: 0.018276817778276156
+- feature: Sustainability_Risk_Index
+  importance: 0.017185569860092596
+- feature: Labour_Compliance_Score
+  importance: 0.016237083981002615
+- feature: Diversity_Index
+  importance: 0.015783992415114242
+- feature: Green_Efficiency_Score
+  importance: 0.01560015313886636
+- feature: Financial_Stability_Score
+  importance: 0.01555523932912027
+- feature: Water_Intensity
+  importance: 0.01536566433403897
+- feature: Supplier_Audit_Score
+  importance: 0.01535987569780931
+- feature: Production_Capacity
+  importance: 0.015189733862603211
+- feature: Operational_Reliability_Index
+  importance: 0.015077219908150724
+- feature: Waste_Management_Efficiency
+  importance: 0.015009312864593206
+- feature: LeadTime_Capacity_Ratio
+  importance: 0.014894207427582105
+- feature: On_Time_Delivery_Rate
+  importance: 0.014649683409758741
+- feature: Emission_Votality
+  importance: 0.014496912922733017
+- feature: Logistics_Distance_km
+  importance: 0.014262541605447574
+- feature: Cost_Index
+  importance: 0.014133965286697671
+- feature: Carbon_Emission_Intensity
+  importance: 0.01413237774996988
+- feature: Emission_Per_Dollar
+  importance: 0.013938746256300795
+- feature: Renewable_Energy_Usage
+  importance: 0.01390514820303216
+- feature: Emission_to_Capacity_Ratio
+  importance: 0.013752234190414943
+- feature: Lead_Time_Days
+  importance: 0.012953686130309368
+- feature: Country_Japan
+  importance: 0.012881353953365041
+- feature: Resilience_Score
+  importance: 0.012611989978351622
+- feature: Region_South America
+  importance: 0.012110746374934745
+- feature: Country_China
+  importance: 0.008983331744527498
+- feature: Compliance_Level
+  importance: 0.005415543647303926
+- feature: Supplier_Tier
+  importance: 0.0036182827191571175
+- feature: Sustainability_Report_Availability
+  importance: 0.003260287389734975
+- feature: Region_North America
+  importance: 0.002856455936323136
+- feature: Country_India
+  importance: 0.002459396407650686
+- feature: Country_Indonesia
+  importance: 0.002451964131917214
+- feature: Industry_Sector_Metals
+  importance: 0.002223561079814733
+- feature: Industry_Sector_Chemicals
+  importance: 0.002179052514140882
+- feature: Industry_Sector_Electronics
+  importance: 0.0020304240088120304
+- feature: Country_USA
+  importance: 0.001970211714690362
+- feature: Country_Malaysia
+  importance: 0.001964434318561236
+- feature: Industry_Sector_Food & Beverage
+  importance: 0.0017711682105481126
+- feature: Country_malaysia
+  importance: 0.0006866868133975378
+- feature: Country_brazil
+  importance: 0.00046318340378066053
+- feature: Country_india
+  importance: 0.00032657501253773556
+- feature: Country_indonesia
+  importance: 0.0002992284798451789
+- feature: Country_usa
+  importance: 0.0002719753340456258
+- feature: Country_china
+  importance: 0.0002591398531451091
+- feature: Country_japan
+  importance: 0.00018024403956255747
+feature_names:
+- Supplier_Tier
+- ESG_Score
+- Environmental_Score
+- Social_Score
+- Governance_Score
+- Carbon_Emission_Intensity
+- Water_Intensity
+- Waste_Management_Efficiency
+- Renewable_Energy_Usage
+- Compliance_Level
+- Sustainability_Report_Availability
+- Lead_Time_Days
+- Production_Capacity
+- On_Time_Delivery_Rate
+- Defect_Rate
+- Financial_Stability_Score
+- Cost_Index
+- Labour_Compliance_Score
+- Diversity_Index
+- Supplier_Audit_Score
+- Incident_History_Count
+- Logistics_Distance_km
+- Emission_to_Capacity_Ratio
+- Operational_Reliability_Index
+- LeadTime_Capacity_Ratio
+- Green_Efficiency_Score
+- Resilience_Score
+- Sustainability_Risk_Index
+- ESG_Compliance_Composite
+- Social_Responsibility_Score
+- Regional_Risk_Index
+- Emission_Per_Dollar
+- Emission_Votality
+- Country_China
+- Country_India
+- Country_Indonesia
+- Country_Japan
+- Country_Malaysia
+- Country_USA
+- Country_brazil
+- Country_china
+- Country_india
+- Country_indonesia
+- Country_japan
+- Country_malaysia
+- Country_usa
+- Region_North America
+- Region_South America
+- Industry_Sector_Chemicals
+- Industry_Sector_Electronics
+- Industry_Sector_Food & Beverage
+- Industry_Sector_Metals
+evaluation:
+  roc_curve_file: C:\Final-Year-Project-2025\outputs\models\roc_data\random_forest_roc.npz
+  roc_plot_path: C:\Final-Year-Project-2025\outputs\visualizations\ROC_AUC_3Models.png
+  positive_class: High
+  top_k: '500'

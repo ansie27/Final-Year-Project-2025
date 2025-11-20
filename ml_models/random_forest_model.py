@@ -5,11 +5,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 import numpy as np
 import pandas as pd
-import xgboost as xgb
 import yaml
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -24,13 +23,28 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+utils_path = PROJECT_ROOT / "utils"
+if str(utils_path) not in sys.path:
+    sys.path.insert(0, str(utils_path))
+
+from model_evaluation_utils import (
+    ensure_probability_matrix,
+    evaluate_classification_metrics,
+)
 
 import config
 
 DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
-DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "xgboost_results.yaml"
-DEFAULT_TARGET = "Overall_Risk_Score"
+DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "random_forest_results.yaml"
+DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
+IDENTIFIER_COLUMNS = [
+    "Supplier_ID",
+    "Commodity_ID",
+    "Supplier_Name",
+    "Commodity_Name",
+]
+MODEL_LABEL = "Random Forest"
 
 
 def set_random_seed(seed: Optional[int] = None) -> None:
@@ -61,7 +75,9 @@ def prepare_features(df: pd.DataFrame, target_column: str) -> Tuple[pd.DataFrame
     if target_column not in df.columns:
         raise ValueError(f"Target column '{target_column}' not found in dataset")
 
-    drop_columns = [target_column] + [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_from_config = [col for col in config.EXCLUDE_COLUMNS if col in df.columns and col != target_column]
+    exclude_identifiers = [col for col in IDENTIFIER_COLUMNS if col in df.columns and col != target_column]
+    drop_columns = [target_column] + exclude_from_config + exclude_identifiers
     features = df.drop(columns=drop_columns, errors="ignore").copy()
     if features.shape[1] == 0:
         raise ValueError("No feature columns remain after applying exclusion rules.")
@@ -175,89 +191,75 @@ def compute_metrics(
         metrics["mae"] = float(mean_absolute_error(y_true, y_pred))
         metrics["r2"] = float(r2_score(y_true, y_pred))
     else:
-        if n_classes is None or n_classes == 2:
-            predicted_classes = (y_pred >= 0.5).astype(int)
-        else:
-            predicted_classes = np.argmax(y_pred, axis=1)
-        metrics["accuracy"] = float(accuracy_score(y_true, predicted_classes))
-        metrics["balanced_accuracy"] = float(balanced_accuracy_score(y_true, predicted_classes))
-        metrics["f1_macro"] = float(f1_score(y_true, predicted_classes, average="macro"))
+        metrics["accuracy"] = float(accuracy_score(y_true, y_pred))
+        metrics["balanced_accuracy"] = float(balanced_accuracy_score(y_true, y_pred))
+        metrics["f1_macro"] = float(f1_score(y_true, y_pred, average="macro"))
     return metrics
 
 
-def train_xgboost(
+def train_random_forest(
     bundle: DatasetBundle,
-    max_depth: int,
-    learning_rate: float,
-    subsample: float,
-    colsample_bytree: float,
-    min_child_weight: float,
     n_estimators: int,
-    reg_lambda: float,
-    gamma: float,
+    max_depth: Optional[int],
+    min_samples_split: int,
+    min_samples_leaf: int,
+    max_features: str,
     n_jobs: int,
-) -> Tuple[xgb.Booster, Dict[str, List[float]], Dict[str, float], Dict[str, float]]:
-    train_dmatrix = xgb.DMatrix(bundle.X_train, label=bundle.y_train, feature_names=bundle.feature_names)
-    val_dmatrix = xgb.DMatrix(bundle.X_val, label=bundle.y_val, feature_names=bundle.feature_names)
-    test_dmatrix = xgb.DMatrix(bundle.X_test, label=bundle.y_test, feature_names=bundle.feature_names)
-
+) -> Tuple[object, Dict[str, float], Dict[str, float]]:
     if bundle.task_type == "regression":
-        objective = "reg:squarederror"
-        eval_metric = "rmse"
+        model = RandomForestRegressor(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            random_state=config.RANDOM_SEED,
+            n_jobs=n_jobs,
+        )
     else:
-        if bundle.n_classes is None or bundle.n_classes == 2:
-            objective = "binary:logistic"
-            eval_metric = "logloss"
-        else:
-            objective = "multi:softprob"
-            eval_metric = "mlogloss"
+        model = RandomForestClassifier(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            class_weight="balanced",
+            random_state=config.RANDOM_SEED,
+            n_jobs=n_jobs,
+        )
 
-    params = {
-        "objective": objective,
-        "eval_metric": eval_metric,
-        "max_depth": max_depth,
-        "eta": learning_rate,
-        "subsample": subsample,
-        "colsample_bytree": colsample_bytree,
-        "min_child_weight": min_child_weight,
-        "lambda": reg_lambda,
-        "gamma": gamma,
-        "nthread": n_jobs,
-        "seed": config.RANDOM_SEED,
-    }
-    if bundle.task_type == "classification" and bundle.n_classes and bundle.n_classes > 2:
-        params["num_class"] = bundle.n_classes
+    model.fit(bundle.X_train, bundle.y_train)
 
-    evals_result: Dict[str, List[float]] = {}
-    watchlist = [(train_dmatrix, "train"), (val_dmatrix, "validation")]
+    val_predictions = model.predict(bundle.X_val)
+    test_predictions = model.predict(bundle.X_test)
 
-    booster = xgb.train(
-        params=params,
-        dtrain=train_dmatrix,
-        evals=watchlist,
-        num_boost_round=n_estimators,
-        early_stopping_rounds=15,
-        evals_result=evals_result,
-        verbose_eval=False,
+    val_metrics = compute_metrics(
+        bundle.task_type,
+        bundle.y_val,
+        val_predictions,
+        bundle.n_classes,
     )
+    test_metrics = compute_metrics(
+        bundle.task_type,
+        bundle.y_test,
+        test_predictions,
+        bundle.n_classes,
+    )
+    return model, val_metrics, test_metrics
 
-    val_preds = booster.predict(val_dmatrix)
-    test_preds = booster.predict(test_dmatrix)
 
-    if bundle.task_type == "classification" and (bundle.n_classes is None or bundle.n_classes == 2):
-        test_preds_for_metric = test_preds
-        val_preds_for_metric = val_preds
-    elif bundle.task_type == "classification":
-        test_preds_for_metric = test_preds
-        val_preds_for_metric = val_preds
-    else:
-        test_preds_for_metric = test_preds
-        val_preds_for_metric = val_preds
-
-    val_metrics = compute_metrics(bundle.task_type, bundle.y_val, val_preds_for_metric, bundle.n_classes)
-    test_metrics = compute_metrics(bundle.task_type, bundle.y_test, test_preds_for_metric, bundle.n_classes)
-
-    return booster, evals_result, val_metrics, test_metrics
+def serialize_feature_importance(model: object, feature_names: List[str]) -> List[Dict[str, float]]:
+    if not hasattr(model, "feature_importances_"):
+        return []
+    importances = model.feature_importances_
+    return [
+        {"feature": feature, "importance": float(importance)}
+        for feature, importance in sorted(
+            zip(feature_names, importances),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+    ]
 
 
 def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
@@ -267,21 +269,20 @@ def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train an XGBoost model on the engineered synthetic dataset.")
+    parser = argparse.ArgumentParser(description="Train a Random Forest on the engineered synthetic dataset.")
     parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to syn_20000_engineered_features.csv")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
     parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
     parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
     parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--n-estimators", type=int, default=300, help="Number of boosting rounds.")
-    parser.add_argument("--max-depth", type=int, default=6, help="Maximum tree depth.")
-    parser.add_argument("--learning-rate", type=float, default=0.03, help="Learning rate (eta).")
-    parser.add_argument("--subsample", type=float, default=0.8, help="Subsample ratio of the training instances.")
-    parser.add_argument("--colsample-bytree", type=float, default=0.8, help="Subsample ratio of columns when constructing each tree.")
-    parser.add_argument("--min-child-weight", type=float, default=1.0, help="Minimum sum of instance weight (hessian) needed in a child.")
-    parser.add_argument("--reg-lambda", type=float, default=1.0, help="L2 regularization term on weights.")
-    parser.add_argument("--gamma", type=float, default=0.0, help="Minimum loss reduction required to make a further partition.")
-    parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel threads used to run XGBoost.")
+    parser.add_argument("--n-estimators", type=int, default=300, help="Number of trees in the forest.")
+    parser.add_argument("--max-depth", type=int, default=None, help="Maximum tree depth.")
+    parser.add_argument("--min-samples-split", type=int, default=2, help="Minimum samples required to split an internal node.")
+    parser.add_argument("--min-samples-leaf", type=int, default=1, help="Minimum samples required to be at a leaf node.")
+    parser.add_argument("--max-features", type=str, default="sqrt", help="Number of features to consider when looking for the best split.")
+    parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel jobs for training.")
+    parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
+    parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
     args = parser.parse_args()
 
     set_random_seed(config.RANDOM_SEED)
@@ -303,18 +304,27 @@ def main() -> None:
         random_state=config.RANDOM_SEED,
     )
 
-    booster, evals_result, val_metrics, test_metrics = train_xgboost(
+    model, val_metrics, test_metrics = train_random_forest(
         bundle=bundle,
-        max_depth=args.max_depth,
-        learning_rate=args.learning_rate,
-        subsample=args.subsample,
-        colsample_bytree=args.colsample_bytree,
-        min_child_weight=args.min_child_weight,
         n_estimators=args.n_estimators,
-        reg_lambda=args.reg_lambda,
-        gamma=args.gamma,
+        max_depth=args.max_depth,
+        min_samples_split=args.min_samples_split,
+        min_samples_leaf=args.min_samples_leaf,
+        max_features=args.max_features,
         n_jobs=args.n_jobs,
     )
+    evaluation_details = None
+    if bundle.task_type == "classification":
+        prob_matrix = ensure_probability_matrix(model.predict_proba(bundle.X_test), bundle.n_classes)
+        extra_metrics, evaluation_details = evaluate_classification_metrics(
+            MODEL_LABEL,
+            bundle.y_test,
+            prob_matrix,
+            bundle.class_names,
+            args.positive_class,
+            args.top_k,
+        )
+        test_metrics.update(extra_metrics)
 
     payload: Dict[str, Any] = {
         "dataset": {
@@ -326,15 +336,12 @@ def main() -> None:
             "class_names": bundle.class_names,
         },
         "training": {
-            "model": "XGBoost",
+            "model": "RandomForestRegressor" if bundle.task_type == "regression" else "RandomForestClassifier",
             "n_estimators": args.n_estimators,
             "max_depth": args.max_depth,
-            "learning_rate": args.learning_rate,
-            "subsample": args.subsample,
-            "colsample_bytree": args.colsample_bytree,
-            "min_child_weight": args.min_child_weight,
-            "reg_lambda": args.reg_lambda,
-            "gamma": args.gamma,
+            "min_samples_split": args.min_samples_split,
+            "min_samples_leaf": args.min_samples_leaf,
+            "max_features": args.max_features,
             "n_jobs": args.n_jobs,
             "random_seed": config.RANDOM_SEED,
             "test_size": args.test_size,
@@ -344,13 +351,14 @@ def main() -> None:
             "validation": val_metrics,
             "test": test_metrics,
         },
-        "history": evals_result,
+        "feature_importance": serialize_feature_importance(model, bundle.feature_names),
         "feature_names": bundle.feature_names,
-        "best_iteration": booster.best_iteration,
     }
+    if evaluation_details:
+        payload["evaluation"] = evaluation_details
 
     save_results_yaml(args.output_path, payload)
-    print(f"[+] XGBoost training complete. Results saved to {args.output_path}")
+    print(f"[+] Random Forest training complete. Results saved to {args.output_path}")
 
 
 if __name__ == "__main__":
