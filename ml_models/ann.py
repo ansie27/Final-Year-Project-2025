@@ -32,15 +32,16 @@ DEFAULT_TARGET = "Overall_Risk_Score"
 CLASS_THRESHOLD = 15
 
 
-def set_random_seeds(seed: int) -> None:
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    random.seed(seed)
-    np.random.seed(seed)
+def set_random_seeds(seed: Optional[int] = None) -> None:
+    resolved_seed = config.RANDOM_SEED if seed is None else seed
+    os.environ["PYTHONHASHSEED"] = str(resolved_seed)
+    random.seed(resolved_seed)
+    np.random.seed(resolved_seed)
     if tf is not None:
-        tf.random.set_seed(seed)
+        tf.random.set_seed(resolved_seed)
     if torch is not None:
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+        torch.manual_seed(resolved_seed)
+        torch.cuda.manual_seed_all(resolved_seed)
 
 
 def load_dataset(path: Path) -> pd.DataFrame:
