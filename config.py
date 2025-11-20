@@ -10,38 +10,14 @@ PROJECT_ROOT = Path(__file__).parent
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+RAW_DATA_PATH = RAW_DATA_DIR / "syn_supplier_commodity_dataset.csv"
+PROCESSED_DATA_PATH = PROCESSED_DATA_DIR / "preprocessed_data.csv"
 
 # Output directories
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 VISUALIZATIONS_DIR = OUTPUT_DIR / "visualizations"
 REPORTS_DIR = OUTPUT_DIR / "reports"
 MODELS_DIR = OUTPUT_DIR / "models"
-
-# Create output directories if they don't exist
-OUTPUT_DIR.mkdir(exist_ok=True)
-VISUALIZATIONS_DIR.mkdir(exist_ok=True)
-REPORTS_DIR.mkdir(exist_ok=True)
-MODELS_DIR.mkdir(exist_ok=True)
-
-# =====================================================================
-# DATA FILES
-# =====================================================================
-RAW_DATA_FILES = {
-    'supplier': RAW_DATA_DIR / "synthetic_supplier_dataset_1.csv",
-    'commodity': RAW_DATA_DIR / "SupplyChainGHGEmissionFactors_v1.2_NAICS_byGHG_USD2021.csv",
-    'co2': RAW_DATA_DIR / "owid-co2-data.csv",
-    'esg': RAW_DATA_DIR / "SP 500 ESG Risk Ratings.csv"
-}
-
-PROCESSED_DATA_FILES = {
-    'supplier': PROCESSED_DATA_DIR / "preprocessed_supplier_data.csv",
-    'commodity': PROCESSED_DATA_DIR / "preprocessed_commodity_data.csv",
-    'co2': PROCESSED_DATA_DIR / "preprocessed_co2_data.csv",
-    'esg': PROCESSED_DATA_DIR / "preprocessed_esg_data.csv",
-    'esg_industry': PROCESSED_DATA_DIR / "preprocessed_esg_by_industry.csv",
-    'integrated': PROCESSED_DATA_DIR / "integrated_commodity_dataset.csv",
-    'enhanced': PROCESSED_DATA_DIR / "integrated_dataset_with_risk_metrics.csv"
-}
 
 # =====================================================================
 # REPRODUCIBILITY
