@@ -120,6 +120,30 @@
     }
   },
   {
+    "dataset": "syn_20000_data.csv",
+    "model_type": "TVAE",
+    "rows": 20000,
+    "metrics": {
+      "statistical": {
+        "ks": 0.11358395721925135,
+        "chi_square": 1244.4109105640534,
+        "js_divergence": 0.1777610851922253
+      },
+      "correlation": {
+        "pearson_diff": 0.026947950545824245,
+        "spearman_diff": 0.02664020613617662
+      },
+      "distribution": {
+        "wasserstein": 181.08878048914505,
+        "mse": 371949.10870704346
+      },
+      "ml_utility": {
+        "tstr_accuracy": 0.851764705882353,
+        "trts_accuracy": 0.7561
+      }
+    }
+  },
+  {
     "dataset": "TVAE_10000_data.csv",
     "model_type": "TVAE",
     "rows": 10000,
