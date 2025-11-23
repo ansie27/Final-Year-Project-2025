@@ -1,0 +1,92 @@
+{
+  "standard": {
+    "weights": [
+      {
+        "feature": "Country",
+        "weight": 0.34195543682411345
+      },
+      {
+        "feature": "ESG_Score",
+        "weight": 0.2352870753822995
+      },
+      {
+        "feature": "Sustainability_Report_Availability",
+        "weight": 0.20538662266831834
+      },
+      {
+        "feature": "Compliance_Level",
+        "weight": 0.04293457581062069
+      },
+      {
+        "feature": "Renewable_Energy_Usage",
+        "weight": 0.03727379201162274
+      },
+      {
+        "feature": "On_Time_Delivery_Rate",
+        "weight": 0.03498455415851135
+      },
+      {
+        "feature": "Water_Intensity",
+        "weight": 0.03134470726207557
+      },
+      {
+        "feature": "Carbon_Emission_Intensity",
+        "weight": 0.028161752457304106
+      },
+      {
+        "feature": "Social_Score",
+        "weight": 0.025522602947832717
+      },
+      {
+        "feature": "Region",
+        "weight": 0.017148880477301346
+      }
+    ],
+    "consistency_ratio": 0.06791268288707558
+  },
+  "ga_optimised": {
+    "weights": [
+      {
+        "feature": "Country",
+        "weight": 0.3411007123357684
+      },
+      {
+        "feature": "ESG_Score",
+        "weight": 0.23455903832812378
+      },
+      {
+        "feature": "Sustainability_Report_Availability",
+        "weight": 0.20475020374254008
+      },
+      {
+        "feature": "Compliance_Level",
+        "weight": 0.042832801688190654
+      },
+      {
+        "feature": "Renewable_Energy_Usage",
+        "weight": 0.0358347925586043
+      },
+      {
+        "feature": "On_Time_Delivery_Rate",
+        "weight": 0.04106805554828487
+      },
+      {
+        "feature": "Water_Intensity",
+        "weight": 0.029585386321054445
+      },
+      {
+        "feature": "Carbon_Emission_Intensity",
+        "weight": 0.029585386321054445
+      },
+      {
+        "feature": "Social_Score",
+        "weight": 0.0254632297901613
+      },
+      {
+        "feature": "Region",
+        "weight": 0.015220393366217378
+      }
+    ],
+    "consistency_ratio": 0.0735945630422652
+  }
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "feature": "Country",
+    "importance": 0.011572619047619031
+  },
+  {
+    "feature": "ESG_Score",
+    "importance": 0.007244444444444394
+  },
+  {
+    "feature": "Sustainability_Report_Availability",
+    "importance": 0.00597222222222217
+  },
+  {
+    "feature": "Compliance_Level",
+    "importance": 0.001261111111111076
+  },
+  {
+    "feature": "Renewable_Energy_Usage",
+    "importance": 0.0011500000000000362
+  },
+  {
+    "feature": "On_Time_Delivery_Rate",
+    "importance": 0.0011000000000000317
+  },
+  {
+    "feature": "Water_Intensity",
+    "importance": 0.001033333333333365
+  },
+  {
+    "feature": "Carbon_Emission_Intensity",
+    "importance": 0.0009777777777778083
+  },
+  {
+    "feature": "Social_Score",
+    "importance": 0.0009333333333333612
+  },
+  {
+    "feature": "Region",
+    "importance": 0.0007574074074074309
+  }
+]
