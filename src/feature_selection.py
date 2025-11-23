@@ -18,16 +18,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-try:
-    from src.utils import ensure_directory, print_section_header, print_progress
-except ModuleNotFoundError:
-    from utils import ensure_directory, print_section_header, print_progress
+from src.utils import ensure_directory, print_section_header, print_progress
 
 
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "syn_20000_engineered_features.csv"
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "visualizations"
 PLOT_PATH = OUTPUT_DIR / "top_10_critical_features.png"
-CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.csv"
+CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.json"
 TARGET_COLUMN = "Risk_Classification"
 IDENTIFIER_COLUMNS = [
     "Supplier_ID",
