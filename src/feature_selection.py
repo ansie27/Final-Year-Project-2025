@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -26,6 +27,7 @@ except ModuleNotFoundError:
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "syn_20000_engineered_features.csv"
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "visualizations"
 PLOT_PATH = OUTPUT_DIR / "top_10_critical_features.png"
+CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.csv"
 TARGET_COLUMN = "Risk_Classification"
 IDENTIFIER_COLUMNS = [
     "Supplier_ID",
@@ -71,8 +73,6 @@ def identify_feature_types(X: pd.DataFrame) -> Tuple[List[str], List[str]]:
 def build_model_pipeline(
     categorical_cols: List[str], numeric_cols: List[str], model_random_state: int | None = None
 ) -> Pipeline:
-    """Create the preprocessing and modeling pipeline."""
-
     transformers = []
     if categorical_cols:
         transformers.append(
@@ -103,20 +103,12 @@ def build_model_pipeline(
         ]
     )
 
-
 def aggregate_feature_importances(
     importances: np.ndarray,
     categorical_cols: List[str],
     numeric_cols: List[str],
     preprocessor: ColumnTransformer,
 ) -> pd.DataFrame:
-    """
-    Aggregate permutation importances to the original feature level.
-
-    For categorical columns, the mean absolute importance across all one-hot encoded
-    categories is used to avoid bias toward features with many categories.
-    """
-
     aggregated: Dict[str, float] = {}
     processed_index = 0
 
@@ -141,7 +133,6 @@ def aggregate_feature_importances(
     )
 
     return importance_df
-
 
 def compute_permutation_importance(
     pipeline: Pipeline,
@@ -170,7 +161,6 @@ def compute_permutation_importance(
         result.importances_mean, categorical_cols, numeric_cols, preprocessor
     )
 
-
 def calculate_importance_delta(previous: pd.DataFrame, current: pd.DataFrame) -> float:
     """Calculate mean absolute change between two importance rankings."""
     merged = (
@@ -178,7 +168,6 @@ def calculate_importance_delta(previous: pd.DataFrame, current: pd.DataFrame) ->
         .fillna(0.0)
     )
     return float(np.abs(merged["importance_prev"] - merged["importance_curr"]).mean())
-
 
 def compute_stable_permutation_importance(
     pipeline: Pipeline,
@@ -264,12 +253,19 @@ def plot_top_features(top_features: pd.DataFrame, output_path: Path) -> None:
     plt.close()
     print(f"Visualization saved to {output_path}")
 
-
 def display_summary(top_features: pd.DataFrame) -> None:
     """Print the top features to the terminal."""
     print_section_header("Top 10 Critical Features (Permutation Importance)")
     for rank, row in enumerate(top_features.itertuples(index=False), start=1):
         print(f"{rank:>2}. {row.feature:<40} Importance: {row.importance:.5f}")
+
+
+def save_top_features_json(top_features: pd.DataFrame, output_path: Path) -> None:
+    """Persist the top feature importances as JSON."""
+    ensure_directory(output_path.parent)
+    records = top_features.to_dict(orient="records")
+    output_path.write_text(json.dumps(records, indent=2))
+    print_progress(f"Saved critical features to {output_path}")
 
 
 def run_feature_selection() -> None:
@@ -309,6 +305,7 @@ def run_feature_selection() -> None:
     )
 
     top_10 = importance_df.head(10)
+    save_top_features_json(top_10, CRITICAL_FEATURES_PATH)
     display_summary(top_10)
     plot_top_features(top_10, PLOT_PATH)
 
