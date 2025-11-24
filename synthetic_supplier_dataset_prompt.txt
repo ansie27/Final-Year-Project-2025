@@ -123,12 +123,17 @@ Generate a supplier-commodity dataset according to these rules and constraints:
 - Labour_Compliance_Score, Float, compliance with labour and safety standards, 91.2
 - Diversity_Index, Float, measure of diversity and inclusion in workforce, 0.54
 - Financial_Stability_Score, Float, creditworthiness or liquidity score, 87.0
+- Freight_Cost, Float, annual freight/transportation cost (USD) for shipping the commodity for that specific year, 14500.0
 - Cost_Index, Float, relative cost compared to industry average, 0.65
 - Commodity_Price_Index, Float, yearly commodity price index, 1.12
 - Commodity_Demand, Integer, annual demand volume for the commodity, 35000
 - Trade_Volume, Integer, annual trade volume (metric tons or units), 12000
 - Logistics_Distance_km, Integer, distance between supplier and buyer, 3200
 - Risk_Classification, String, the target value determining Low, Moderate, or High risk, Moderate, NOT NULL
+
+2. Refer to supplier_commodity_list.txt and extract the Supplier_Name, Commodity_Name, Country, Supplier_Tier, Industry_Sector
+3. This dataset should adhere to global supply chain disruptions that have occured in 2019 to 2025 (as of October), such as Covid-19 in (2020), The Ukraine War (2022), US-China Trade War (2022) etc.
+4. 
 
 
 
