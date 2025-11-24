@@ -90,6 +90,52 @@ Generate a supplier and commodity dataset according to these rules and constrain
 4. The dataset should have real-world noise and problems that need to be preprocessed, including missing values, duplicates, inconsistencies, etc.
 5. Output will be a .csv file named "syn_supplier_commodity_dataset.csv"
 
+Version 4:
+Generate a supplier-commodity dataset according to these rules and constraints:
+1. Generate a dataset with 50000 rows of these attributes by following these criteria of attribute name, data type, description, example value, additional constraints (optional):
+- SC_ID, String, unique supplier-commodity identifier, S0000001, NOT NULL
+- Supplier_Name, String, name of supplier company, Sime Darby Plantation, has to be a supplier that exists in the real-world and can be repeated, NOT NULL
+- Commodity_Name, String, name of commodity, Palm fruits, has to be a commodity that the specified supplier in Supplier_Name supplies in the real-world, NOT NULL
+- Year, Integer, year of the record, 2019, has to be 2019 to 2025 in ascending order and NOT NULL
+- Country, Categorical, supplier country of operation, Japan, NOT NULL
+- Region, Categorical, regional classification for risk mapping, Asia-Pacific, NOT NULL
+- Supplier_Tier, Integer, tier level in the supply chain, 3, NOT NULL
+- Industry_Sector, Categorical, industry classification of the supplier and commodity, Agriculture, NOT NULL
+- ESG_Score, Float, combined environmental, social and governance performance score, 82.5, range 0 - 100
+- Environmental_Score, Float, component score focusing on environmental impact, 78.2, range 0 - 100
+- Social_Score, Float, component score for labour practices safety and equity, 85.0, range 0 - 100
+- Governance_Score, Float, component score for transparency, audit and compliance, 84.3, range 0 - 100
+- Carbon_Emission_Intensity, Float, metric tons CO2e per production unit, 0.0800
+- GHG_Scope1_Intensity, Float, direct emissions per production unit per year, 1.20
+- GHG_Scope2_Intensity, Float, purchased electricity emissions per production unit per year, 0.85
+- GHG_Scope3_Intensity, Float, supply-chain emissions per production unit per year, 2.40
+- Water_Intensity, Float, litres (L) of water required per production unit, 200.0
+- Waste_Management_Efficiency, Float, proportion of waste recycled or reused, 0.78
+- Renewable_Energy_Usage, Float, fraction of total energy from renewable sources, 0.62
+- Compliance_Level, Ordinal, 0=None, 1=Partial, 2=Compliant, 3=Certified, 3, NOT NULL
+- Sustainability_Report_Availability, Binary, whether supplier publishes a sustainability report for that year, 1
+- Certifications_Active, String, list of active certifications in that year (ISO 14001, RSPO etc.), "ISO 14001; RSPO"
+- Lead_Time_Days, Integer, average lead time in days, 25
+- Production_Capacity, Integer, units or metric tons per month, 12000
+- On_Time_Delivery_Rate, Float, percentage of orders delivered on time, 0.94
+- Defect_Rate, Float, percentage of defective or returned items, 0.03
+- Incident_History_Count, Integer, number of recorded environmental/social violations in that year, 2
+- Labour_Compliance_Score, Float, compliance with labour and safety standards, 91.2
+- Diversity_Index, Float, measure of diversity and inclusion in workforce, 0.54
+- Financial_Stability_Score, Float, creditworthiness or liquidity score, 87.0
+- Freight_Cost, Float, annual freight/transportation cost (USD) for shipping the commodity for that specific year, 14500.0
+- Cost_Index, Float, relative cost compared to industry average, 0.65
+- Commodity_Price_Index, Float, yearly commodity price index, 1.12
+- Commodity_Demand, Integer, annual demand volume for the commodity, 35000
+- Trade_Volume, Integer, annual trade volume (metric tons or units), 12000
+- Logistics_Distance_km, Integer, distance between supplier and buyer, 3200
+- Risk_Classification, String, the target value determining Low, Moderate, or High risk, Moderate, NOT NULL
+
+2. Refer to supplier_commodity_list.txt and extract the Supplier_Name, Commodity_Name, Country, Supplier_Tier, Industry_Sector
+3. This dataset should adhere to global supply chain disruptions that have occured in 2019 to 2025 (as of October), such as Covid-19 in (2020), The Ukraine War (2022), US-China Trade War (2022) etc.
+4. 
+
+
 
 
 
