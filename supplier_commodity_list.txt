@@ -1,0 +1,31 @@
+# Supplier-commodity combination of all 6 major global regions
+# This is the most frequently used international supply chain framework
+
+Asia-Pacific:
+
+
+
+
+
+
+North America (USMCA):
+
+
+
+
+
+Europe (EU)
+
+
+
+Latin America and Caribbean (LATAM)
+
+
+
+Middle East and South Africa (MENA)
+
+
+
+Sub-Saharan Africa (SSA)
+
+

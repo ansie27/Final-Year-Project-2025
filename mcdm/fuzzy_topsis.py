@@ -3,7 +3,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
-
 import numpy as np
 import pandas as pd
 from prettytable import PrettyTable
@@ -84,6 +83,7 @@ def normalise_matrix(df: pd.DataFrame, feature_names: Sequence[str]) -> np.ndarr
     min_vals = values.min(axis=0)
     max_vals = values.max(axis=0)
     denom = np.where(np.isclose(max_vals - min_vals, 0), 1.0, max_vals - min_vals)
+    print_progress("Matrix normalised", step=3)
     return (values - min_vals) / denom
 
 
@@ -96,6 +96,7 @@ def build_fuzzy_matrix(normalised: np.ndarray, weights: np.ndarray) -> List[List
             value_tfn = TriangularFuzzyNumber(value, value, value)
             fuzzy_row.append(value_tfn * weight_tfn)
         matrix.append(fuzzy_row)
+    print_progress("Fuzzy decision matrix constructed")
     return matrix
 
 
@@ -111,6 +112,7 @@ def determine_ideal_solutions(
         u_values = [tfn.u for tfn in column]
         fpis.append(TriangularFuzzyNumber(max(l_values), max(m_values), max(u_values)))
         fnis.append(TriangularFuzzyNumber(min(l_values), min(m_values), min(u_values)))
+    print_progress("FPIS and FNIS determined")
     return fpis, fnis
 
 
@@ -122,6 +124,7 @@ def calculate_distances(
     for row in weighted_matrix:
         total = sum(vertex_distance(cell, ideal) for cell, ideal in zip(row, ideals))
         distances.append(total)
+    print_progress(f"Calculated distances for {len(distances)} alternatives")
     return np.asarray(distances, dtype=float)
 
 
@@ -129,10 +132,12 @@ def perform_fuzzy_topsis(
     normalised_matrix: np.ndarray,
     weights: np.ndarray,
 ) -> Tuple[np.ndarray, List[TriangularFuzzyNumber], List[TriangularFuzzyNumber]]:
+    print_progress("Building weighted matrix")
     weighted_matrix = build_fuzzy_matrix(normalised_matrix, weights)
     fpis, fnis = determine_ideal_solutions(weighted_matrix)
     d_plus = calculate_distances(weighted_matrix, fpis)
     d_minus = calculate_distances(weighted_matrix, fnis)
+    print_progress("Computed closeness coefficients")
     closeness = d_minus / np.where((d_plus + d_minus) == 0, 1e-12, d_plus + d_minus)
     return closeness, fpis, fnis
 
@@ -173,7 +178,8 @@ def ga_optimise_weights(
     normalised_matrix: np.ndarray,
     target_scores: np.ndarray,
     seed_weights: np.ndarray,
-    generations: int = 60,
+    # generations: int = 60,
+    generations: int = 10,
     population_size: int = 40,
     mutation_rate: float = 0.2,
     crossover_rate: float = 0.8,
@@ -213,12 +219,15 @@ def ga_optimise_weights(
     population = initialise_population()
     best = population[0]
     best_score = fitness(best)
+    print_progress("GA optimisation started")
 
-    for _ in range(generations):
+    for generation in range(generations):
         scores = np.array([fitness(individual) for individual in population])
         if scores.min() < best_score:
             best = population[scores.argmin()]
             best_score = scores.min()
+        if generation % 5 == 0:
+            print_progress(f"GA generation {generation}: best stability {-best_score:.4f}")
 
         new_population = []
         while len(new_population) < population_size:
