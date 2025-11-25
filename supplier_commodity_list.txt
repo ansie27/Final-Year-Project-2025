@@ -2,7 +2,7 @@
 # This is the most frequently used international supply chain framework
 # Format: Supplier_Name, Commodity_Name, Country, Supplier_Tier, Industry_Sector
 
-East Asia and Pacific: 
+Region: East Asia and Pacific
 "Wilmar International", "Crude palm oil", "Singapore", 1, "Agriculture"
 "Wilmar International", "Crude palm oil", "Indonesia", 1, "Agriculture"
 "Wilmar International", "Crude palm oil", "Malaysia", 1, "Agriculture"
@@ -43,8 +43,53 @@ East Asia and Pacific:
 "BYD Semiconductor", "Automotive-grade semiconductors", "China", 1, "Semiconductors"
 "Haier Smart Home", "Electric vehicles", "China", 1, "Automotive"
 "Haier COSMOplat Internet of Things Ecological Technology Co., Ltd.", "IoT-enabled smart manufacturing components", "China", 1, "Industrial IoT"
+Foxconn Technology Group, Electronic components and device assembly, China, 1, Electronics/Manufacturing
+BOE Technology Group, LCD and OLED display panels, China, 1, Electronics
+Yunnan Tin Company Limited, Refined tin and tin-based materials, China, 1, Metals and Mining
+China Baowu Steel Group, Steel billets and flat steel products, China, 1, Metals
+Zhejiang Huayou Cobalt Co., Ltd., Cobalt sulfate and precursor materials, China, 1, Energy Materials
+Ganfeng Lithium Co., Ltd., Lithium carbonate and lithium hydroxide, China, 1, Energy Materials
+Tianqi Lithium, Lithium hydroxide and lithium compounds, China, 1, Chemicals/Energy
+China Northern Rare Earth Group, Rare earth oxides and metals, China, 1, Rare Earth Materials
+Jiangxi Copper Corporation, Copper cathodes and copper rods, China, 1, Metals
+Xinxing Ductile Iron Pipes, Ductile iron pipes and fittings, China, 1, Industrial Manufacturing
+Mitsubishi Materials Corporation, Copper products and electronic materials, Japan, 1, Materials
+Sumitomo Metal Mining, Nickel, gold, and cobalt materials, Japan, 1, Metals and Mining
+Furukawa Electric Co., Ltd., Electrical wiring and copper cables, Japan, 1, Electronics/Materials
+Nippon Steel Corporation, Steel plates, coils, and structural steel, Japan, 1, Materials
+Hitachi Metals (Proterial), Specialty alloys and magnetic materials, Japan, 1, Materials/Manufacturing
+Showa Denko K.K. (Resonac), Graphite electrodes and electronic chemicals, Japan, 1, Chemicals
+Murata Manufacturing Co., Electronic components (capacitors, sensors), Japan, 1, Electronics
+ROHM Semiconductor, Power semiconductors, Japan, 1, Semiconductors
+Kyocera Corporation, Electronic components and ceramic materials, Japan, 1, Electronics
+Mitsui Chemicals, Polyethylene and industrial chemicals, Japan, 1, Chemicals
+SK Hynix, DRAM and NAND flash memory chips, South Korea, 1, Semiconductors
+POSCO, Steel products and specialty metals, South Korea, 1, Metals
+OCI Company Ltd., Polysilicon for solar cells, South Korea, 1, Energy Materials
+Hyundai Steel, Steel plates and automotive steel sheets, South Korea, 1, Materials
+Hanwha Q CELLS, Photovoltaic modules and solar materials, South Korea, 1, Renewable Energy
+Lotte Chemical, Petrochemicals and polymers, South Korea, 1, Chemicals
+Doosan Corporation, Heavy machinery components, South Korea, 1, Industrial Manufacturing
+Amorepacific Manufacturing, Packaging materials and cosmetic chemical inputs, South Korea, 1, FMCG
+Hyundai Mobis, Automotive parts and systems, South Korea, 1, Automotive
+PT Timah Tbk, Refined tin and tin alloys, Indonesia, 1, Metals and Mining
+Adaro Energy, Thermal coal and mining products, Indonesia, 1, Energy/Mining
+PT Krakatau Steel, Hot-rolled and cold-rolled steel, Indonesia, 1, Materials
+PT Pupuk Indonesia, Fertilizers (urea, ammonia), Indonesia, 1, Agriculture/Chemicals
+Petronas Chemicals Group, Petrochemicals and industrial gases, Malaysia, 1, Chemicals
+Press Metal Aluminium Holdings, Aluminium ingots and billets, Malaysia, 1, Metals
+Top Glove Corporation, Latex and nitrile raw materials, Malaysia, 1, Healthcare/Manufacturing
+Thai Union Group, Processed seafood raw materials, Thailand, 1, FMCG/Agriculture
+PTT Global Chemical, Petrochemical raw materials, Thailand, 1, Chemicals
+Siam Cement Group (SCG), Cement, chemicals, and packaging materials, Thailand, 1, Materials
+Rio Tinto Group, Iron ore, aluminium, and minerals, Australia, 1, Metals and Mining
+BHP Group, Nickel, iron ore, and metallurgical coal, Australia, 1, Metals and Mining
+Pilbara Minerals, Lithium spodumene concentrate, Australia, 1, Energy Materials
+Fortescue Metals Group, Iron ore, Australia, 1, Metals and Mining
+Fonterra Co-operative Group, Dairy ingredients and powders, New Zealand, 1, Agriculture
+NZ Steel, Steel billets and flat steel, New Zealand, 1, Materials
 
-South Asia:
+Region: South Asia
 "Tata Motors", "Commercial vehicles and parts", "India", 1, "Automotive"
 "Tata Steel", "Automotive steel", "India", 1, "Steel/Materials"
 "Reliance Industries Limited", "Polypropylene, Polyethylene, PTA (petrochemicals and polymers)", "India", 1, "Petrochemicals"
@@ -120,7 +165,7 @@ South Asia:
 "Asian Paints", "Decorative paints, industrial coatings", "India", 1, "Chemicals/Paints"
 "Blue Star Limited", "Air conditioning equipment and compressors (commercial HVAC)", "India", 2, "HVAC/Components"
 
-North America:
+Region: North America
 "Intel Corporation", "Microprocessors and chipsets", "United States", 1, "Semiconductors"
 "Advanced Micro Devices (AMD)", "CPUs and GPUs", "United States", 1, "Semiconductors"
 "NVIDIA Corporation", "GPUs and AI accelerators", "United States", 1, "Semiconductors"
@@ -180,7 +225,7 @@ North America:
 "Bombardier Recreational Products (BRP)", "Power-sports vehicles", "Canada", 1, "Automotive/Equipment"
 "CN Rail (Canadian National Railway)", "Rail freight logistics", "Canada", 2, "Logistics/Transportation"
 
-Europe and Central Asia:
+Region: Europe and Central Asia
 "Volkswagen Group", "Automobiles and automotive components", "Germany", 1, "Automotive"
 "BMW Group", "Passenger vehicles, engines, EV components", "Germany", 1, "Automotive"
 "Mercedes-Benz Group", "Luxury vehicles, powertrains", "Germany", 1, "Automotive"
@@ -257,7 +302,7 @@ Europe and Central Asia:
 "Petrofac Kazakhstan suppliers", "Oilfield equipment", "Kazakhstan", 2, "Oilfield Services"
 "Samruk-Energy", "Coal-fired power generation", "Kazakhstan", 1, "Energy"
 
-Latin America and Caribbean:
+Region: Latin America and Caribbean
 "Vale S.A.", "Iron ore, iron ore pellets, nickel, copper", "Brazil", 1, "Metals and Minings"
 "Petrobras", "Crude oil, natural gas, refined fuels", "Brazil", 1, "Oil and Gas"
 "JBS S.A.", "Beef, pork and poultry meat products", "Brazil", 1, "Food Processing/Meat"
@@ -347,7 +392,7 @@ Latin America and Caribbean:
 "Cargill/Louis Dreyfus/ADM (Local Subsidiaries)", "Grains, oilseeds, sugar, coffee (export origination)", "Argentina", 1, "Commodities Trading/Agribusiness"
 "Cargill/Louis Dreyfus/ADM (Local Subsidiaries)", "Grains, oilseeds, sugar, coffee (export origination)", "Colombia", 1, "Commodities Trading/Agribusiness"
 
-Middle East, North Africa, Afghanistan and Pakistan: 
+Region: Middle East, North Africa, Afghanistan and Pakistan
 "Saudi Arabian Oil Company (Aramco)", "Crude oil, refined fuels, LPG, naphtha, diesel, jet fuel, sulfur", "Saudi Arabia", 1, "Oil and Gas/Refining"
 "SABIC (Saudi Basic Industries Corporation)", "Olefins, polyolefins, glycols, aromatics, engineering plastics, specialty chemicals", "Saudi Arabia", 1, "Petrochemicals/Polymers"
 "Ma'aden (Saudi Arabian Mining Company)", "Phosphate rock, phosphate fertilizers, gold, aluminium", "Saudi Arabia", 1, "Mining and Metals"
@@ -420,7 +465,7 @@ Middle East, North Africa, Afghanistan and Pakistan:
 "Cevital Group", "Food processing (sugar, edible oils), steel distribution", "Algeria", 2, "FMCG/Industrial"
 "Naftal", "Fuel distribution and marketing", "Algeria", 1, "Oil and Gas Distribution"
 
-Sub-Saharan Africa:
+Region: Sub-Saharan Africa
 "Sasol", "Diesel, gasoline, naphtha, LPG, olefins, polymers, ammonia, methanol, solvents", "South Africa", 1, "Chemicals and Fuels"
 "Anglo American", "Platinum group metals, diamonds, iron ore, coal", "South Africa", 1, "Metals and Mining"
 "Impala Platinum (Implats)", "Platinum group metals (PGMs), palladium, rhodium", "South Africa", 1, "Metals and Mining"

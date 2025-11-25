@@ -97,10 +97,10 @@ Generate a supplier-commodity dataset according to these rules and constraints:
 - Supplier_Name, String, name of supplier company, Sime Darby Plantation, has to be a supplier that exists in the real-world and can be repeated, NOT NULL
 - Commodity_Name, String, name of commodity, Palm fruits, has to be a commodity that the specified supplier in Supplier_Name supplies in the real-world, NOT NULL
 - Year, Integer, year of the record, 2019, has to be 2019 to 2025 in ascending order and NOT NULL
-- Country, Categorical, supplier country of operation, Japan, NOT NULL
-- Region, Categorical, regional classification for risk mapping, Asia-Pacific, NOT NULL
+- Country, String, supplier country of operation, Japan, NOT NULL
+- Region, String, regional classification for risk mapping, Asia-Pacific, NOT NULL
 - Supplier_Tier, Integer, tier level in the supply chain, 3, NOT NULL
-- Industry_Sector, Categorical, industry classification of the supplier and commodity, Agriculture, NOT NULL
+- Industry_Sector, String, industry classification of the supplier and commodity, Agriculture, NOT NULL
 - ESG_Score, Float, combined environmental, social and governance performance score, 82.5, range 0 - 100
 - Environmental_Score, Float, component score focusing on environmental impact, 78.2, range 0 - 100
 - Social_Score, Float, component score for labour practices safety and equity, 85.0, range 0 - 100
@@ -131,7 +131,7 @@ Generate a supplier-commodity dataset according to these rules and constraints:
 - Logistics_Distance_km, Integer, distance between supplier and buyer, 3200
 - Risk_Classification, String, the target value determining Low, Moderate, or High risk, Moderate, NOT NULL
 
-2. Refer to supplier_commodity_list.txt and extract the Supplier_Name, Commodity_Name, Country, Supplier_Tier, Industry_Sector
+2. Refer to supplier_commodity_list.txt and extract the Supplier_Name, Commodity_Name, Country, Supplier_Tier, Industry_Sector. Note that the "Region" attribute is already stated inside as well, and follows region definition by World Bank.
 3. Supplier-Commodity can be repeated throughout the years, which will be used to establish relationships in Power BI. (Eg. Intel,Microchips,2020 and Intel,Microchips,2024)
 4. This dataset should adhere to global supply chain disruptions that have occured in 2019 to 2025 (as of October), such as Covid-19 in (2020), The Ukraine War (2022), US-China Trade War (2022) etc.
 5. This dataset should adhere to embargoed countries, therefore their values need to be adjusted accordingly
