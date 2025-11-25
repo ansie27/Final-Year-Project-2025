@@ -11,7 +11,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 RAW_DATA_PATH = RAW_DATA_DIR / "syn_supplier_commodity_dataset.csv"
-PROCESSED_DATA_PATH = PROCESSED_DATA_DIR / "preprocessed_data.csv"
+PROCESSED_DATA_PATH = PROCESSED_DATA_DIR / "preprocessed_supplier_commodity_dataset.csv"
 
 # Output directories
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
