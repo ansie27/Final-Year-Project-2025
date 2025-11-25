@@ -25,14 +25,18 @@ PLACEHOLDER_TOKENS = {
     "-",
 }
 
-ID_COLUMNS = ["Supplier_ID", "Commodity_ID"]
+ID_COLUMNS = ["SC_ID"]
 NUMERIC_COLUMNS = [
+    "Year",
     "Supplier_Tier",
     "ESG_Score",
     "Environmental_Score",
     "Social_Score",
     "Governance_Score",
     "Carbon_Emission_Intensity",
+    "GHG_Scope1_Intensity",
+    "GHG_Scope2_Intensity",
+    "GHG_Scope3_Intensity",
     "Water_Intensity",
     "Waste_Management_Efficiency",
     "Renewable_Energy_Usage",
@@ -42,12 +46,15 @@ NUMERIC_COLUMNS = [
     "Production_Capacity",
     "On_Time_Delivery_Rate",
     "Defect_Rate",
-    "Financial_Stability_Score",
-    "Cost_Index",
+    "Incident_History_Count",
     "Labour_Compliance_Score",
     "Diversity_Index",
-    "Supplier_Audit_Score",
-    "Incident_History_Count",
+    "Financial_Stability_Score",
+    "Freight_Cost",
+    "Cost_Index",
+    "Commodity_Price_Index",
+    "Commodity_Demand",
+    "Trade_Volume",
     "Logistics_Distance_km",
 ]
 RATIO_COLUMNS = [
@@ -60,6 +67,7 @@ RATIO_COLUMNS = [
 ]
 BINARY_COLUMNS = ["Sustainability_Report_Availability"]
 INTEGER_COLUMNS = [
+    "Year",
     "Supplier_Tier",
     "Compliance_Level",
     "Lead_Time_Days",
@@ -72,6 +80,9 @@ NON_NEGATIVE_COLUMNS = [
     "Social_Score",
     "Governance_Score",
     "Carbon_Emission_Intensity",
+    "GHG_Scope1_Intensity",
+    "GHG_Scope2_Intensity",
+    "GHG_Scope3_Intensity",
     "Water_Intensity",
     "Waste_Management_Efficiency",
     "Renewable_Energy_Usage",
@@ -81,14 +92,27 @@ NON_NEGATIVE_COLUMNS = [
     "Production_Capacity",
     "On_Time_Delivery_Rate",
     "Defect_Rate",
+    "Freight_Cost",
+    "Commodity_Price_Index",
+    "Commodity_Demand",
+    "Trade_Volume",
     "Financial_Stability_Score",
     "Cost_Index",
     "Labour_Compliance_Score",
     "Diversity_Index",
-    "Supplier_Audit_Score",
     "Incident_History_Count",
     "Logistics_Distance_km",
 ]
+
+REGION_CODE_MAP = {
+    "east asia and pacific": "EAP",
+    "south asia": "SA",
+    "north america": "NA",
+    "sub-saharan africa": "SSA",
+    "europe and central asia": "ECA",
+    "latin america and caribbean": "LAC",
+    "middle east, north africa, afghanistan and pakistan": "MENA-AP",
+}
 
 RISK_LEVEL_MAP = {
     "low": "Low",
@@ -107,7 +131,6 @@ def preprocess_data(
     raw_path: str | Path = RAW_DATA_PATH,
     output_path: str | Path = PROCESSED_DATA_PATH,
 ) -> pd.DataFrame:
-    """Clean the raw dataset and persist a noise-reduced copy."""
     raw_path = Path(raw_path)
     output_path = Path(output_path)
 
@@ -120,6 +143,8 @@ def preprocess_data(
         .pipe(_standardise_column_names)
         .pipe(_clean_text_columns)
         .pipe(_normalise_risk_classification)
+        .pipe(_uppercase_country)
+        .pipe(_map_region_codes)
     )
     df = _coerce_numeric_columns(df)
     df = df.drop_duplicates().reset_index(drop=True)
@@ -175,6 +200,35 @@ def _normalise_risk_classification(df: pd.DataFrame) -> pd.DataFrame:
         return value
 
     df["Risk_Classification"] = df["Risk_Classification"].map(_normalise)
+    return df
+
+
+def _uppercase_country(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure country codes/names are uppercase for consistency."""
+    if "Country" not in df.columns:
+        return df
+    df = df.copy()
+    df["Country"] = df["Country"].map(
+        lambda value: value.upper() if isinstance(value, str) else value
+    )
+    return df
+
+
+def _map_region_codes(df: pd.DataFrame) -> pd.DataFrame:
+    """Map verbose region labels to their short codes."""
+    region_columns = [col for col in ("Region", "Regions") if col in df.columns]
+    if not region_columns:
+        return df
+
+    def _map_value(value: object) -> object:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return REGION_CODE_MAP.get(cleaned.lower(), cleaned)
+        return value
+
+    df = df.copy()
+    for col in region_columns:
+        df[col] = df[col].map(_map_value)
     return df
 
 
