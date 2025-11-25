@@ -92,7 +92,7 @@ Generate a supplier and commodity dataset according to these rules and constrain
 
 Version 4:
 Generate a supplier-commodity dataset according to these rules and constraints:
-1. Generate a dataset with 50000 rows of these attributes by following these criteria of attribute name, data type, description, example value, additional constraints (optional):
+1. Generate a dataset with 20000 rows of these attributes by following these criteria of attribute name, data type, description, example value, additional constraints (optional):
 - SC_ID, String, unique supplier-commodity identifier, SC0000001, NOT NULL
 - Supplier_Name, String, name of supplier company, Sime Darby Plantation, has to be a supplier that exists in the real-world and can be repeated, NOT NULL
 - Commodity_Name, String, name of commodity, Palm fruits, has to be a commodity that the specified supplier in Supplier_Name supplies in the real-world, NOT NULL
@@ -132,9 +132,11 @@ Generate a supplier-commodity dataset according to these rules and constraints:
 - Risk_Classification, String, the target value determining Low, Moderate, or High risk, Moderate, NOT NULL
 
 2. Refer to supplier_commodity_list.txt and extract the Supplier_Name, Commodity_Name, Country, Supplier_Tier, Industry_Sector
-3. This dataset should adhere to global supply chain disruptions that have occured in 2019 to 2025 (as of October), such as Covid-19 in (2020), The Ukraine War (2022), US-China Trade War (2022) etc.
-4. The dataset should have real-world noise and problems that need to be preprocessed, including missing values, duplicates, inconsistencies, etc.
-5. Output will be a .csv file named "syn_supplier_commodity_dataset.csv"
+3. Supplier-Commodity can be repeated throughout the years, which will be used to establish relationships in Power BI. (Eg. Intel,Microchips,2020 and Intel,Microchips,2024)
+4. This dataset should adhere to global supply chain disruptions that have occured in 2019 to 2025 (as of October), such as Covid-19 in (2020), The Ukraine War (2022), US-China Trade War (2022) etc.
+5. This dataset should adhere to embargoed countries, therefore their values need to be adjusted accordingly
+6. The dataset should have real-world noise and problems that need to be preprocessed, including missing values, duplicates, inconsistencies, etc.
+7. Output will be a .csv file named "syn_supplier_commodity_dataset.csv"
 
 
 
