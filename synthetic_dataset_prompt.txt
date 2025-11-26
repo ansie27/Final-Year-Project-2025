@@ -96,6 +96,7 @@ Generate a supplier-commodity dataset according to these rules and constraints:
 - SC_ID, String, unique supplier-commodity identifier, SC0000001, NOT NULL
 - Supplier_Name, String, name of supplier company, Sime Darby Plantation, has to be a supplier that exists in the real-world and can be repeated, NOT NULL
 - Commodity_Name, String, name of commodity, Palm fruits, has to be a commodity that the specified supplier in Supplier_Name supplies in the real-world, NOT NULL
+- Month, String, month of the record, January, has to be in chronological order and NOT NULL
 - Year, Integer, year of the record, 2019, has to be 2019 to 2025 in ascending order and NOT NULL
 - Country, String, supplier country of operation, Japan, NOT NULL
 - Region, String, regional classification for risk mapping, Asia-Pacific, NOT NULL
