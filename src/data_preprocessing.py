@@ -4,6 +4,7 @@ import pandas as pd
 import re
 import sys
 from pathlib import Path
+from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -25,8 +26,55 @@ PLACEHOLDER_TOKENS = {
     "-",
 }
 
-ID_COLUMNS = ["SC_ID"]
-NUMERIC_COLUMNS = [
+EDA_COLUMNS = (
+    "SC_ID",
+    "Supplier_Name",
+    "Commodity_Name",
+    "Year",
+    "Month",
+    "Country",
+    "Region",
+    "Supplier_Tier",
+    "Industry_Sector",
+    "ESG_Score",
+    "Environmental_Score",
+    "Social_Score",
+    "Governance_Score",
+    "Carbon_Emission_Intensity",
+    "GHG_Scope1_Intensity",
+    "GHG_Scope2_Intensity",
+    "GHG_Scope3_Intensity",
+    "Water_Intensity",
+    "Waste_Management_Efficiency",
+    "Renewable_Energy_Usage",
+    "Compliance_Level",
+    "Sustainability_Report_Availability",
+    "Certifications_Active",
+    "Lead_Time_Days",
+    "Production_Capacity",
+    "On_Time_Delivery_Rate",
+    "Defect_Rate",
+    "Incident_History_Count",
+    "Labour_Compliance_Score",
+    "Diversity_Index",
+    "Financial_Stability_Score",
+    "Freight_Cost",
+    "Cost_Index",
+    "Commodity_Price_Index",
+    "Commodity_Demand",
+    "Trade_Volume",
+    "Logistics_Distance_km",
+    "Risk_Classification",
+)
+
+
+def _filter_known(columns: Iterable[str]) -> list[str]:
+    """Return only columns verified in the EDA notebook."""
+    return [col for col in columns if col in EDA_COLUMNS]
+
+
+ID_COLUMNS = _filter_known(["SC_ID"])
+NUMERIC_COLUMNS = _filter_known([
     "Year",
     "Supplier_Tier",
     "ESG_Score",
@@ -56,25 +104,25 @@ NUMERIC_COLUMNS = [
     "Commodity_Demand",
     "Trade_Volume",
     "Logistics_Distance_km",
-]
-RATIO_COLUMNS = [
+])
+RATIO_COLUMNS = _filter_known([
     "Carbon_Emission_Intensity",
     "Waste_Management_Efficiency",
     "Renewable_Energy_Usage",
     "On_Time_Delivery_Rate",
     "Defect_Rate",
     "Diversity_Index",
-]
-BINARY_COLUMNS = ["Sustainability_Report_Availability"]
-INTEGER_COLUMNS = [
+])
+BINARY_COLUMNS = _filter_known(["Sustainability_Report_Availability"])
+INTEGER_COLUMNS = _filter_known([
     "Year",
     "Supplier_Tier",
     "Compliance_Level",
     "Lead_Time_Days",
     "Production_Capacity",
     "Incident_History_Count",
-]
-NON_NEGATIVE_COLUMNS = [
+])
+NON_NEGATIVE_COLUMNS = _filter_known([
     "ESG_Score",
     "Environmental_Score",
     "Social_Score",
@@ -102,7 +150,7 @@ NON_NEGATIVE_COLUMNS = [
     "Diversity_Index",
     "Incident_History_Count",
     "Logistics_Distance_km",
-]
+])
 
 REGION_CODE_MAP = {
     "east asia and pacific": "EAP",
@@ -112,6 +160,21 @@ REGION_CODE_MAP = {
     "europe and central asia": "ECA",
     "latin america and caribbean": "LAC",
     "middle east, north africa, afghanistan and pakistan": "MENA-AP",
+}
+
+MONTH_ABBREVIATIONS = {
+    "january": "JAN",
+    "february": "FEB",
+    "march": "MAR",
+    "april": "APR",
+    "may": "MAY",
+    "june": "JUN",
+    "july": "JUL",
+    "august": "AUG",
+    "september": "SEP",
+    "october": "OCT",
+    "november": "NOV",
+    "december": "DEC",
 }
 
 RISK_LEVEL_MAP = {
@@ -144,6 +207,7 @@ def preprocess_data(
         .pipe(_clean_text_columns)
         .pipe(_normalise_risk_classification)
         .pipe(_uppercase_country)
+        .pipe(_abbreviate_month)
         .pipe(_map_region_codes)
     )
     df = _coerce_numeric_columns(df)
@@ -211,6 +275,24 @@ def _uppercase_country(df: pd.DataFrame) -> pd.DataFrame:
     df["Country"] = df["Country"].map(
         lambda value: value.upper() if isinstance(value, str) else value
     )
+    return df
+
+
+def _abbreviate_month(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize month names to three-letter uppercase abbreviations."""
+    if "Month" not in df.columns:
+        return df
+
+    def _map_month(value: object) -> object:
+        if isinstance(value, str):
+            cleaned = value.strip().lower()
+            if not cleaned:
+                return value
+            return MONTH_ABBREVIATIONS.get(cleaned, cleaned[:3].upper())
+        return value
+
+    df = df.copy()
+    df["Month"] = df["Month"].map(_map_month)
     return df
 
 
