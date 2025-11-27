@@ -27,7 +27,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import ADASYN, SMOTENC
-from sdv.tabular import CTGAN, TVAE
+from sdv.tabular import CTGAN, TVAE  # type: ignore
 from config import (
     FEATURE_COLUMNS,
     MODEL_CONFIG,
@@ -41,7 +41,6 @@ from config import (
 warnings.filterwarnings("ignore")
 
 TARGET_COLUMN = "Risk_Classification"
-BEST_DATASET_FILENAME = "oversampled_preprocessed_supplier_commodity_dataset.csv"
 GAN_EPOCHS = 150
 CLASSIFIER_CONFIG = {
     "n_estimators": 300,
@@ -229,6 +228,7 @@ def evaluate_sampler(
         visualization_path=viz_path,
     )
 
+# SMOTENC oversampling
 def smotenc_sampler_factory(
     categorical_features: List[int],
 ) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
@@ -243,6 +243,7 @@ def smotenc_sampler_factory(
 
     return _sampler
 
+# ADASYN oversampling
 def adasyn_sampler_factory() -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         sampler = ADASYN(random_state=RANDOM_SEED)
@@ -251,7 +252,7 @@ def adasyn_sampler_factory() -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.Dat
 
     return _sampler
 
-
+# SMOTE + ENN oversampling
 def smoteenn_sampler_factory() -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         sampler = SMOTEENN(random_state=RANDOM_SEED)
@@ -377,10 +378,10 @@ def choose_best_result(results: List[EvaluationResult]) -> EvaluationResult:
     )
     return best
 
-def run_oversampling() -> Path:
+def run_oversampling(df: pd.DataFrame | None = None) -> pd.DataFrame:
     ensure_directories()
-    df = load_dataset()
-    X, y = select_features(df)
+    data = df.copy() if df is not None else load_dataset()
+    X, y = select_features(data)
     test_size = MODEL_CONFIG.get("test_size", 0.2)
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -397,17 +398,17 @@ def run_oversampling() -> Path:
     best_result = choose_best_result(results)
     best_sampler = samplers[best_result.name]
     X_best, y_best = best_sampler(X_train.copy(), y_train.copy())
-    best_df = pd.concat([X_best.reset_index(drop=True), y_best.reset_index(drop=True)], axis=1)
-    output_path = PROCESSED_DATA_DIR / BEST_DATASET_FILENAME
-    best_df.to_csv(output_path, index=False)
-    logger.info("Saved oversampled training dataset to %s", output_path)
+    best_df = pd.concat(
+        [X_best.reset_index(drop=True), y_best.reset_index(drop=True)],
+        axis=1,
+    )
 
     logger.info(
         "Oversampling completed. Train size: %d (oversampled), Test size (untouched): %d",
         len(X_best),
         len(X_test),
     )
-    return output_path
+    return best_df
 
 if __name__ == "__main__":
     run_oversampling()

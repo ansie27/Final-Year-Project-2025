@@ -5,12 +5,15 @@ import re
 import sys
 from pathlib import Path
 from typing import Iterable
-from config import RAW_DATA_PATH, PROCESSED_DATA_PATH
-from oversampling import run_oversampling
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from config import RAW_DATA_PATH, PROCESSED_DATA_PATH  # noqa: E402
+from oversampling import run_oversampling  # noqa: E402
+
+OVERSAMPLED_OUTPUT_FILENAME = "oversampled_preprocessed_supplier_commodity_dataset.csv"
 
 PLACEHOLDER_TOKENS = {
     "",
@@ -460,6 +463,12 @@ def preprocess_data(
         raise FileNotFoundError(f"Raw dataset not found at {raw_path}")
 
     df = pd.read_csv(raw_path)
+    try:
+        df = run_oversampling(df.copy())
+        print("Oversampling completed successfully. Proceeding to preprocessing.")
+    except Exception as exc:
+        print(f"Oversampling step failed: {exc}")
+
     df = (
         df.copy()
         .pipe(_standardise_column_names)
@@ -477,18 +486,14 @@ def preprocess_data(
     df = _enforce_value_ranges(df)
     df = _finalize_dtypes(df)
 
-    processed_dir = output_path.parent
+    final_output_path = output_path.with_name(OVERSAMPLED_OUTPUT_FILENAME)
+    processed_dir = final_output_path.parent
     processed_dir.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, index=False)
-    print(f"Preprocessed dataset saved to {output_path} with {len(df)} rows.")
-    try:
-        oversampled_path = run_oversampling()
-        print(
-            "Oversampling completed successfully. "
-            f"Oversampled dataset saved to {oversampled_path}."
-        )
-    except Exception as exc:
-        print(f"Oversampling step failed: {exc}")
+    df.to_csv(final_output_path, index=False)
+    print(
+        "Preprocessed & oversampled dataset saved to "
+        f"{final_output_path} with {len(df)} rows."
+    )
     return df
 
 def _standardise_column_names(df: pd.DataFrame) -> pd.DataFrame:
@@ -606,7 +611,6 @@ def _map_industry_sector(df: pd.DataFrame) -> pd.DataFrame:
     df[column] = df[column].map(_map_value)
     return df
 
-
 def _coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     present_numeric = [col for col in NUMERIC_COLUMNS if col in df.columns]
@@ -653,7 +657,6 @@ def _winsorize_numeric_outliers(
         df[col] = series.clip(lower=lower, upper=upper)
     return df
 
-
 def _enforce_value_ranges(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     for col in NON_NEGATIVE_COLUMNS:
@@ -670,7 +673,6 @@ def _enforce_value_ranges(df: pd.DataFrame) -> pd.DataFrame:
     if "Compliance_Level" in df.columns:
         df["Compliance_Level"] = df["Compliance_Level"].clip(0, 3)
     return df
-
 
 def _finalize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
