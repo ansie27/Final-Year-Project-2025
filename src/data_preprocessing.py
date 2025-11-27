@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import MODEL_CONFIG, PROCESSED_DATA_PATH, RAW_DATA_PATH, RANDOM_SEED, FEATURE_COLUMNS
-from oversampling import run_oversampling
+from imb.oversampling import run_oversampling
 
 OVERSAMPLED_OUTPUT_FILENAME = "oversampled_preprocessed_supplier_commodity_dataset.csv"
 TEST_OUTPUT_FILENAME = "preprocessed_test_supplier_commodity_dataset.csv"

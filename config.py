@@ -137,7 +137,6 @@ FEATURE_COLUMNS = [
     'Commodity_Demand',
     'Trade_Volume',
     'Logistics_Distance_km',
-    'Risk_Classification',
 ]
 
 EXCLUDE_COLUMNS = [
