@@ -27,7 +27,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import ADASYN, SMOTENC
-from sdv.tabular import CTGAN, TVAE  # type: ignore
+from sdv.single_table import CTGANSynthesizer, TVAESynthesizer
 from config import (
     FEATURE_COLUMNS,
     MODEL_CONFIG,
@@ -321,8 +321,12 @@ def evaluate_all(
         "SMOTENC": smotenc_sampler_factory(categorical_indices or []),
         "ADASYN": adasyn_sampler_factory(),
         "SMOTE + ENN": smoteenn_sampler_factory(),
-        "CTGAN": gan_sampler_factory(CTGAN, list(X.columns), discrete_columns),
-        "TVAE": gan_sampler_factory(TVAE, list(X.columns), discrete_columns),
+        "CTGAN": gan_sampler_factory(
+            CTGANSynthesizer, list(X.columns), discrete_columns
+        ),
+        "TVAE": gan_sampler_factory(
+            TVAESynthesizer, list(X.columns), discrete_columns
+        ),
     }
 
     class_labels = sorted(y.unique())

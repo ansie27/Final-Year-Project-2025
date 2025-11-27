@@ -10,8 +10,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import RAW_DATA_PATH, PROCESSED_DATA_PATH  # noqa: E402
-from oversampling import run_oversampling  # noqa: E402
+from config import RAW_DATA_PATH, PROCESSED_DATA_PATH 
+from oversampling import run_oversampling
 
 OVERSAMPLED_OUTPUT_FILENAME = "oversampled_preprocessed_supplier_commodity_dataset.csv"
 
