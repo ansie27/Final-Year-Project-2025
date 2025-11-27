@@ -27,10 +27,6 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.model_selection import StratifiedKFold, train_test_split
-from imblearn.combine import SMOTEENN
-from imblearn.over_sampling import ADASYN, SMOTENC
-from sdv.single_table import CTGANSynthesizer, TVAESynthesizer
-from sdv.metadata import SingleTableMetadata
 from config import (
     FEATURE_COLUMNS,
     MODEL_CONFIG,
@@ -40,6 +36,11 @@ from config import (
     RANDOM_SEED,
     VISUALIZATIONS_DIR,
 )
+from imb.adasyn_oversampler import create_adasyn_sampler
+from imb.smote_enn_oversampler import create_smote_enn_sampler
+from imb.smotenc_oversampler import create_smotenc_sampler
+from imb.tvae_oversampler import create_tvae_sampler
+from imb.ctgan_oversampler import create_ctgan_sampler
 
 warnings.filterwarnings("ignore")
 
@@ -279,62 +280,29 @@ def evaluate_sampler(
         visualization_path=viz_path,
     )
 
-# SMOTENC oversampling
-def smotenc_sampler_factory(
-    categorical_features: List[int],
-) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        sampler = SMOTENC(
-            categorical_features=categorical_features,
-            sampling_strategy="auto",
-            random_state=RANDOM_SEED,
-        )
-        X_res, y_res = sampler.fit_resample(X, y)
-        return pd.DataFrame(X_res, columns=X.columns), pd.Series(y_res, name=y.name)
-
-    return _sampler
-
-# ADASYN oversampling
-def adasyn_sampler_factory() -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        sampler = ADASYN(random_state=RANDOM_SEED)
-        X_res, y_res = sampler.fit_resample(X, y)
-        return pd.DataFrame(X_res, columns=X.columns), pd.Series(y_res, name=y.name)
-
-    return _sampler
-
-# SMOTE + ENN oversampling
-def smoteenn_sampler_factory() -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        sampler = SMOTEENN(random_state=RANDOM_SEED)
-        X_res, y_res = sampler.fit_resample(X, y)
-        return pd.DataFrame(X_res, columns=X.columns), pd.Series(y_res, name=y.name)
-
-    return _sampler
-
-def gan_sampler_factory(
-    model_cls,
+def create_ctgan_sampler(
     feature_columns: List[str],
     discrete_columns: List[str],
 ) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
+    """Create CTGAN sampler (kept local as requested)."""
+
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         train_df = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
         metadata = SingleTableMetadata()
         metadata.detect_from_dataframe(train_df)
-        
-        # Update discrete columns in metadata
+
         for col in set(discrete_columns + [TARGET_COLUMN]):
             if col in train_df.columns:
-                metadata.update_column(column_name=col, sdtype='categorical')
-        
-        model = model_cls(
+                metadata.update_column(column_name=col, sdtype="categorical")
+
+        model = CTGANSynthesizer(
             metadata=metadata,
             epochs=GAN_EPOCHS,
             verbose=False,
             batch_size=min(512, len(train_df)),
         )
         model.fit(train_df)
-        
+
         counts = y.value_counts()
         max_count = counts.max()
         synthetic_parts = []
@@ -343,8 +311,6 @@ def gan_sampler_factory(
             deficit = int(max_count - count)
             if deficit <= 0:
                 continue
-            
-            # Sample with conditions
             condition_df = pd.DataFrame({TARGET_COLUMN: [label] * deficit})
             try:
                 synthetic = model.sample_from_conditions(
@@ -366,11 +332,10 @@ def gan_sampler_factory(
 
         X_aug = augmented_df[feature_columns].copy()
         y_aug = augmented_df[TARGET_COLUMN].copy()
-        
-        # Ensure all columns are numeric
+
         for col in X_aug.columns:
-            X_aug[col] = pd.to_numeric(X_aug[col], errors='coerce')
-        
+            X_aug[col] = pd.to_numeric(X_aug[col], errors="coerce")
+
         return X_aug, y_aug
 
     return _sampler
@@ -384,14 +349,15 @@ def evaluate_all(
 ) -> Tuple[List[EvaluationResult], Dict[str, Callable]]:
 
     samplers: Dict[str, Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]] = {
-        "SMOTENC": smotenc_sampler_factory(categorical_indices or []),
-        "ADASYN": adasyn_sampler_factory(),
-        "SMOTE + ENN": smoteenn_sampler_factory(),
-        "CTGAN": gan_sampler_factory(
-            CTGANSynthesizer, list(X.columns), discrete_columns
-        ),
-        "TVAE": gan_sampler_factory(
-            TVAESynthesizer, list(X.columns), discrete_columns
+        "SMOTENC": create_smotenc_sampler(categorical_indices or []),
+        "ADASYN": create_adasyn_sampler(),
+        "SMOTE + ENN": create_smote_enn_sampler(),
+        "CTGAN": create_ctgan_sampler(list(X.columns), discrete_columns),
+        "TVAE": create_tvae_sampler(
+            list(X.columns),
+            discrete_columns,
+            TARGET_COLUMN,
+            GAN_EPOCHS,
         ),
     }
 
