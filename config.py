@@ -121,8 +121,7 @@ FEATURE_COLUMNS = [
 ]
 
 EXCLUDE_COLUMNS = [
-    'Supplier_ID',
-    'Supplier_Name',
+    'SC_ID',
     'Risk_Classification'
 ]
 
