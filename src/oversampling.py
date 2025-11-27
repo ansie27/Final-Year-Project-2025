@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
 import matplotlib.pyplot as plt
-plt.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 import pandas as pd
 import seaborn as sns
