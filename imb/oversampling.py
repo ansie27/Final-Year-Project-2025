@@ -2,17 +2,16 @@
 # Undersampling would not be favourable since it would result in data loss
 # Techniques to be tested:
 # 1. SMOTENC
-# 2. ADASYN
-# 3. SMOTE + ENN
-# 4. CTGAN
-# 5. TVAE
+# 2. SMOTE + ENN
+# 3. CTGAN
+# 4. TVAE
 
 import logging
 import warnings
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -29,9 +28,14 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from imblearn.combine import SMOTEENN
-from imblearn.over_sampling import ADASYN, SMOTENC
+from imblearn.over_sampling import SMOTENC
 from sdv.metadata import SingleTableMetadata
 from sdv.single_table import CTGANSynthesizer, TVAESynthesizer
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 
 from config import (
     FEATURE_COLUMNS,
@@ -297,8 +301,6 @@ def create_smotenc_sampler(
     categorical_features: List[int],
     config: Dict[str, Union[int, str]],
 ) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    """Return a sampler function that applies SMOTENC using a shared config."""
-
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         sampler = SMOTENC(
             categorical_features=categorical_features,
@@ -310,24 +312,10 @@ def create_smotenc_sampler(
 
     return _sampler
 
-# ADASYN oversampler
-def create_adasyn_sampler(
-    config: Dict[str, Union[int, str]],
-) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    """Return a sampler function that applies ADASYN using shared settings."""
-
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        sampler = ADASYN(random_state=config["random_state"])
-        X_res, y_res = sampler.fit_resample(X, y)
-        return pd.DataFrame(X_res, columns=X.columns), pd.Series(y_res, name=y.name)
-
-    return _sampler
-
 # SMOTE + ENN oversampler
 def create_smote_enn_sampler(
     config: Dict[str, Union[int, str]],
 ) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    """Return a sampler function that applies SMOTE+ENN using shared settings."""
 
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         sampler = SMOTEENN(random_state=config["random_state"])
@@ -343,7 +331,6 @@ def create_ctgan_sampler(
     target_column: str,
     gan_config: Dict[str, Union[int, bool]],
 ) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    """Return a sampler function that applies CTGAN to the dataset."""
 
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         train_df = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
@@ -459,67 +446,6 @@ def create_tvae_sampler(
 
     return _sampler
 
-# CTGAN oversampler
-def create_ctgan_sampler(
-    feature_columns: List[str],
-    discrete_columns: List[str],
-) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
-    """Create CTGAN sampler (kept local as requested)."""
-
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        train_df = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
-        metadata = SingleTableMetadata()
-        metadata.detect_from_dataframe(train_df)
-
-        for col in set(discrete_columns + [TARGET_COLUMN]):
-            if col in train_df.columns:
-                metadata.update_column(column_name=col, sdtype="categorical")
-
-        model = CTGANSynthesizer(
-            metadata=metadata,
-            epochs=GAN_EPOCHS,
-            verbose=False,
-            batch_size=min(512, len(train_df)),
-        )
-        model.fit(train_df)
-
-        counts = y.value_counts()
-        max_count = counts.max()
-        synthetic_parts = []
-
-        for label, count in counts.items():
-            deficit = int(max_count - count)
-            if deficit <= 0:
-                continue
-            condition_df = pd.DataFrame({TARGET_COLUMN: [label] * deficit})
-            try:
-                synthetic = model.sample_from_conditions(
-                    conditions=condition_df
-                )
-            except Exception:
-                synthetic = model.sample(deficit)
-                synthetic = synthetic[synthetic[TARGET_COLUMN] == label]
-                if synthetic.empty:
-                    continue
-                synthetic = synthetic.head(deficit)
-            synthetic_parts.append(synthetic)
-
-        if synthetic_parts:
-            synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-            augmented_df = pd.concat([train_df, synthetic_df], ignore_index=True)
-        else:
-            augmented_df = train_df
-
-        X_aug = augmented_df[feature_columns].copy()
-        y_aug = augmented_df[TARGET_COLUMN].copy()
-
-        for col in X_aug.columns:
-            X_aug[col] = pd.to_numeric(X_aug[col], errors="coerce")
-
-        return X_aug, y_aug
-
-    return _sampler
-
 # Evaluation summary
 def evaluate_all(
     X: pd.DataFrame,
@@ -531,7 +457,6 @@ def evaluate_all(
 
     samplers: Dict[str, Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]] = {
         "SMOTENC": create_smotenc_sampler(categorical_indices or [], IMBLEARN_SAMPLER_CONFIG),
-        "ADASYN": create_adasyn_sampler(IMBLEARN_SAMPLER_CONFIG),
         "SMOTE + ENN": create_smote_enn_sampler(IMBLEARN_SAMPLER_CONFIG),
         "CTGAN": create_ctgan_sampler(
             list(X.columns),
