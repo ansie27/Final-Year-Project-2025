@@ -5,15 +5,17 @@ import re
 import sys
 from pathlib import Path
 from typing import Iterable
+from sklearn.model_selection import train_test_split
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import RAW_DATA_PATH, PROCESSED_DATA_PATH 
+from config import MODEL_CONFIG, PROCESSED_DATA_PATH, RAW_DATA_PATH, RANDOM_SEED, FEATURE_COLUMNS
 from oversampling import run_oversampling
 
 OVERSAMPLED_OUTPUT_FILENAME = "oversampled_preprocessed_supplier_commodity_dataset.csv"
+TEST_OUTPUT_FILENAME = "preprocessed_test_supplier_commodity_dataset.csv"
 
 PLACEHOLDER_TOKENS = {
     "",
@@ -192,15 +194,14 @@ RISK_LEVEL_MAP = {
     "critical": "High",
 }
 
-MISSING_VALUE_RULES: dict[str, dict[str, object]] = {
-    "Certifications_Active": {"strategy": "constant", "value": "Not Specified"},
-    "ESG_Score": {"strategy": "median"},
-    "Labour_Compliance_Score": {"strategy": "median"},
-    "Governance_Score": {"strategy": "median"},
-    "Environmental_Score": {"strategy": "median"},
-    "Social_Score": {"strategy": "median"},
-    "Financial_Stability_Score": {"strategy": "median"},
-}
+GEO_MEDIAN_IMPUTE_COLUMNS = [
+    "ESG_Score",
+    "Labour_Compliance_Score",
+    "Governance_Score",
+    "Environmental_Score",
+    "Social_Score",
+    "Financial_Stability_Score",
+]
 
 INDUSTRY_SECTOR_GROUPS: dict[str, tuple[str, ...]] = {
     "Agriculture & Agribusiness": (
@@ -451,27 +452,10 @@ def _build_industry_sector_lookup(
 
 INDUSTRY_SECTOR_LOOKUP = _build_industry_sector_lookup(INDUSTRY_SECTOR_GROUPS)
 
-# Main preprocessing function
-def preprocess_data(
-    raw_path: str | Path = RAW_DATA_PATH,
-    output_path: str | Path = PROCESSED_DATA_PATH,
-) -> pd.DataFrame:
-    raw_path = Path(raw_path)
-    output_path = Path(output_path)
 
-    if not raw_path.exists():
-        raise FileNotFoundError(f"Raw dataset not found at {raw_path}")
-
-    df = pd.read_csv(raw_path)
-    try:
-        df = run_oversampling(df.copy())
-        print("Oversampling completed successfully. Proceeding to preprocessing.")
-    except Exception as exc:
-        print(f"Oversampling step failed: {exc}")
-
+def _apply_preprocessing_steps(df: pd.DataFrame) -> pd.DataFrame:
     df = (
         df.copy()
-        .pipe(_standardise_column_names)
         .pipe(_clean_text_columns)
         .pipe(_normalise_risk_classification)
         .pipe(_uppercase_country)
@@ -484,17 +468,71 @@ def preprocess_data(
     df = _impute_missing_values(df)
     df = _winsorize_numeric_outliers(df)
     df = _enforce_value_ranges(df)
+    df = _encode_categorical_features(df)
     df = _finalize_dtypes(df)
+    return df
+
+
+# Main preprocessing function
+def preprocess_data(
+    raw_path: str | Path = RAW_DATA_PATH,
+    output_path: str | Path = PROCESSED_DATA_PATH,
+) -> pd.DataFrame:
+    raw_path = Path(raw_path)
+    output_path = Path(output_path)
+
+    if not raw_path.exists():
+        raise FileNotFoundError(f"Raw dataset not found at {raw_path}")
+
+    df = pd.read_csv(raw_path)
+    df = _standardise_column_names(df)
+
+    stratify_values = (
+        df["Risk_Classification"] if "Risk_Classification" in df.columns else None
+    )
+    test_size = MODEL_CONFIG.get("test_size", 0.2)
+    random_state = MODEL_CONFIG.get("random_state", RANDOM_SEED)
+
+    train_df, test_df = train_test_split(
+        df,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=stratify_values,
+    )
+
+    train_df = _apply_preprocessing_steps(train_df)
+    test_df = _apply_preprocessing_steps(test_df)
+
+    try:
+        oversampled_train_df = run_oversampling(
+            train_df.copy(),
+            split_before=False,
+        )
+        print("Oversampling completed successfully after preprocessing.")
+    except Exception as exc:
+        oversampled_train_df = train_df
+        print(
+            "Oversampling step failed: "
+            f"{exc}. Using preprocessed training data without oversampling."
+        )
 
     final_output_path = output_path.with_name(OVERSAMPLED_OUTPUT_FILENAME)
     processed_dir = final_output_path.parent
     processed_dir.mkdir(parents=True, exist_ok=True)
-    df.to_csv(final_output_path, index=False)
+    oversampled_train_df.to_csv(final_output_path, index=False)
     print(
-        "Preprocessed & oversampled dataset saved to "
-        f"{final_output_path} with {len(df)} rows."
+        "Preprocessed & oversampled training dataset saved to "
+        f"{final_output_path} with {len(oversampled_train_df)} rows."
     )
-    return df
+
+    test_output_path = output_path.with_name(TEST_OUTPUT_FILENAME)
+    test_df.to_csv(test_output_path, index=False)
+    print(
+        "Preprocessed test dataset saved to "
+        f"{test_output_path} with {len(test_df)} rows."
+    )
+
+    return oversampled_train_df
 
 def _standardise_column_names(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -548,7 +586,6 @@ def _uppercase_country(df: pd.DataFrame) -> pd.DataFrame:
 # Change months from full name to short name
 # Eg. "December" > "DEC"
 def _abbreviate_month(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize month names to three-letter uppercase abbreviations."""
     if "Month" not in df.columns:
         return df
 
@@ -574,7 +611,6 @@ def _abbreviate_month(df: pd.DataFrame) -> pd.DataFrame:
 # "Latin America and Caribbean" > "LAC"
 # "Middle East, North Africa, Afghanistan and Pakistan" > "MENA-AP"
 def _map_region_codes(df: pd.DataFrame) -> pd.DataFrame:
-    """Map verbose region labels to their short codes."""
     region_columns = [col for col in ("Region", "Regions") if col in df.columns]
     if not region_columns:
         return df
@@ -592,7 +628,6 @@ def _map_region_codes(df: pd.DataFrame) -> pd.DataFrame:
 
 # Map Industry_Sector
 def _map_industry_sector(df: pd.DataFrame) -> pd.DataFrame:
-    """Map granular industry labels to consolidated sectors."""
     column = next(
         (col for col in ("Industry_Sector", "Industry") if col in df.columns), None
     )
@@ -623,18 +658,28 @@ def _coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
 # Impute the columns with missing values only (based on EDA)
 def _impute_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    for column, config in MISSING_VALUE_RULES.items():
+    if "Certifications_Active" in df.columns:
+        df["Certifications_Active"] = df["Certifications_Active"].fillna("None")
+
+    for column in GEO_MEDIAN_IMPUTE_COLUMNS:
         if column not in df.columns:
             continue
-        series = df[column]
-        if not series.isna().any():
+        if not df[column].isna().any():
             continue
-        strategy = config.get("strategy")
-        if strategy == "constant":
-            df[column] = series.fillna(config.get("value"))
-        elif strategy == "median":
-            median = series.median()
-            df[column] = series.fillna(median)
+        df = _fill_with_geographic_median(df, column)
+
+    return df
+
+
+def _fill_with_geographic_median(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    df = df.copy()
+    if "Country" in df.columns:
+        country_medians = df.groupby("Country")[column].transform("median")
+        df[column] = df[column].fillna(country_medians)
+    if "Region" in df.columns:
+        region_medians = df.groupby("Region")[column].transform("median")
+        df[column] = df[column].fillna(region_medians)
+    df[column] = df[column].fillna(df[column].median())
     return df
 
 def _winsorize_numeric_outliers(
@@ -673,6 +718,22 @@ def _enforce_value_ranges(df: pd.DataFrame) -> pd.DataFrame:
     if "Compliance_Level" in df.columns:
         df["Compliance_Level"] = df["Compliance_Level"].clip(0, 3)
     return df
+
+# Encode categorical features 
+def _encode_categorical_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    categorical_to_encode = ['Month', 'Region', 'Country', 'Industry_Sector', 
+                             'Certifications_Active']
+    
+    for col in categorical_to_encode:
+        if col in df.columns and col in FEATURE_COLUMNS:
+            # Use label encoding or one-hot encoding
+            from sklearn.preprocessing import LabelEncoder
+            le = LabelEncoder()
+            df[col] = le.fit_transform(df[col].astype(str))
+    
+    return df
+
 
 def _finalize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()

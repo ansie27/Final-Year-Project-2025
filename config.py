@@ -103,25 +103,47 @@ RISK_COLUMNS = [
 ]
 
 FEATURE_COLUMNS = [
-    'Environmental_Score',
+    'Year',
+    'Month',
+    'Country',
+    'Region',
+    'Industry_Sector',
+    'Supplier_Tier',
     'ESG_Score',
+    'Environmental_Score',
     'Social_Score',
     'Governance_Score',
     'Carbon_Emission_Intensity',
-    'Renewable_Energy_Usage',
+    'GHG_Scope1_Intensity',
+    'GHG_Scope2_Intensity',
+    'GHG_Scope3_Intensity',
+    'Water_Intensity',
     'Waste_Management_Efficiency',
+    'Renewable_Energy_Usage',
     'Compliance_Level',
     'Sustainability_Report_Availability',
+    'Certifications_Active',
+    'Lead_Time_Days',
+    'Production_Capacity',
     'On_Time_Delivery_Rate',
     'Defect_Rate',
-    'Financial_Stability_Score',
+    'Incident_History_Count',
     'Labour_Compliance_Score',
-    'Supplier_Audit_Score',
-    'Incident_History_Count'
+    'Diversity_Index',
+    'Financial_Stability_Score',
+    'Freight_Cost',
+    'Cost_Index',
+    'Commodity_Price_Index',
+    'Commodity_Demand',
+    'Trade_Volume',
+    'Logistics_Distance_km',
+    'Risk_Classification',
 ]
 
 EXCLUDE_COLUMNS = [
     'SC_ID',
+    'Supplier_Name',
+    'Commodity_Name',
     'Risk_Classification'
 ]
 

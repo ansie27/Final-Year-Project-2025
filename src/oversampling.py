@@ -11,8 +11,9 @@ import logging
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 import matplotlib.pyplot as plt
+plt.use('Agg')
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -28,6 +29,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from imblearn.combine import SMOTEENN
 from imblearn.over_sampling import ADASYN, SMOTENC
 from sdv.single_table import CTGANSynthesizer, TVAESynthesizer
+from sdv.metadata import SingleTableMetadata
 from config import (
     FEATURE_COLUMNS,
     MODEL_CONFIG,
@@ -76,7 +78,11 @@ def load_dataset() -> pd.DataFrame:
     return pd.read_csv(PROCESSED_DATA_PATH)
 
 def select_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
-    available_features = [col for col in FEATURE_COLUMNS if col in df.columns]
+    available_features = [
+        col
+        for col in FEATURE_COLUMNS
+        if col in df.columns and col != TARGET_COLUMN
+    ]
     if not available_features:
         raise ValueError(
             "None of the configured FEATURE_COLUMNS are present in the dataset."
@@ -86,6 +92,9 @@ def select_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         logger.warning("The following configured features are missing: %s", ", ".join(missing))
 
     X = df[available_features].copy()
+    id_columns = ['SC_ID', 'Supplier_Name', 'Commodity_Name']
+    X = X.drop(columns=[col for col in id_columns if col in X.columns], errors='ignore')
+    
     y = df[TARGET_COLUMN].astype(str).copy()
     return X, y
 
@@ -104,6 +113,47 @@ def determine_categorical_features(X: pd.DataFrame) -> List[str]:
         set(categorical_candidates).intersection(X.columns).union(auto_detected)
     )
     return categorical
+
+
+def encode_categorical_for_sampling(
+    X: pd.DataFrame, categorical_columns: List[str]
+) -> tuple[pd.DataFrame, Dict[str, Union[pd.Index, np.ndarray]]]:
+    if not categorical_columns:
+        encoded = X.copy().apply(pd.to_numeric, errors="ignore")
+        return encoded.astype(float), {}
+    encoded = X.copy()
+    mappings: Dict[str, Union[pd.Index, np.ndarray]] = {}
+    for col in categorical_columns:
+        codes, uniques = pd.factorize(encoded[col], sort=True)
+        encoded[col] = pd.Series(codes, index=encoded.index, dtype=float)
+        mappings[col] = uniques
+    encoded = encoded.apply(pd.to_numeric, errors="coerce").astype(float)
+    return encoded, mappings
+
+
+def decode_categorical_from_sampling(
+    df: pd.DataFrame, mappings: Dict[str, Union[pd.Index, np.ndarray]]
+) -> pd.DataFrame:
+    if not mappings:
+        return df
+    decoded = df.copy()
+    for col, uniques in mappings.items():
+        if col not in decoded.columns:
+            continue
+        values = decoded[col].to_numpy(copy=True)
+        values = np.nan_to_num(values, nan=-1.0)
+        codes = np.rint(values).astype(int)
+        codes[codes < -1] = -1
+        max_code = len(uniques) - 1
+        if max_code >= 0:
+            codes[codes > max_code] = max_code
+        decoded_values = np.empty_like(codes, dtype=object)
+        valid_mask = codes >= 0
+        if valid_mask.any():
+            decoded_values[valid_mask] = uniques.take(codes[valid_mask])
+        decoded_values[~valid_mask] = pd.NA
+        decoded[col] = decoded_values
+    return decoded
 
 def build_classifier() -> RandomForestClassifier:
     return RandomForestClassifier(**CLASSIFIER_CONFIG)
@@ -268,12 +318,22 @@ def gan_sampler_factory(
 ) -> Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]:
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         train_df = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
+        metadata = SingleTableMetadata()
+        metadata.detect_from_dataframe(train_df)
+        
+        # Update discrete columns in metadata
+        for col in set(discrete_columns + [TARGET_COLUMN]):
+            if col in train_df.columns:
+                metadata.update_column(column_name=col, sdtype='categorical')
+        
         model = model_cls(
+            metadata=metadata,
             epochs=GAN_EPOCHS,
             verbose=False,
             batch_size=min(512, len(train_df)),
         )
-        model.fit(train_df, discrete_columns=list(set(discrete_columns + [TARGET_COLUMN])))
+        model.fit(train_df)
+        
         counts = y.value_counts()
         max_count = counts.max()
         synthetic_parts = []
@@ -282,9 +342,13 @@ def gan_sampler_factory(
             deficit = int(max_count - count)
             if deficit <= 0:
                 continue
+            
+            # Sample with conditions
             condition_df = pd.DataFrame({TARGET_COLUMN: [label] * deficit})
             try:
-                synthetic = model.sample_conditions(condition_df)
+                synthetic = model.sample_from_conditions(
+                    conditions=condition_df
+                )
             except Exception:
                 synthetic = model.sample(deficit)
                 synthetic = synthetic[synthetic[TARGET_COLUMN] == label]
@@ -301,7 +365,11 @@ def gan_sampler_factory(
 
         X_aug = augmented_df[feature_columns].copy()
         y_aug = augmented_df[TARGET_COLUMN].copy()
-        X_aug = X_aug.astype(float)
+        
+        # Ensure all columns are numeric
+        for col in X_aug.columns:
+            X_aug[col] = pd.to_numeric(X_aug[col], errors='coerce')
+        
         return X_aug, y_aug
 
     return _sampler
@@ -309,13 +377,10 @@ def gan_sampler_factory(
 def evaluate_all(
     X: pd.DataFrame,
     y: pd.Series,
-    categorical_columns: List[str],
+    categorical_indices: List[int],
+    discrete_columns: List[str],
     n_splits: int,
 ) -> Tuple[List[EvaluationResult], Dict[str, Callable]]:
-    categorical_indices = [
-        X.columns.get_loc(col) for col in categorical_columns if col in X.columns
-    ]
-    discrete_columns = categorical_columns.copy()
 
     samplers: Dict[str, Callable[[pd.DataFrame, pd.Series], Tuple[pd.DataFrame, pd.Series]]] = {
         "SMOTENC": smotenc_sampler_factory(categorical_indices or []),
@@ -332,9 +397,10 @@ def evaluate_all(
     class_labels = sorted(y.unique())
     results: List[EvaluationResult] = []
     for name, sampler_fn in samplers.items():
+        logger.info("\n========== %s OVERSAMPLING ==========", name.upper())
         try:
             result = evaluate_sampler(name, sampler_fn, X, y, class_labels, n_splits)
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             logger.exception("Failed to evaluate %s: %s", name, exc)
             continue
         results.append(result)
@@ -382,22 +448,73 @@ def choose_best_result(results: List[EvaluationResult]) -> EvaluationResult:
     )
     return best
 
-def run_oversampling(df: pd.DataFrame | None = None) -> pd.DataFrame:
+def run_oversampling(
+    df: pd.DataFrame | None = None,
+    *,
+    split_before: bool = True,
+) -> pd.DataFrame:
     ensure_directories()
     data = df.copy() if df is not None else load_dataset()
     X, y = select_features(data)
-    test_size = MODEL_CONFIG.get("test_size", 0.2)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        random_state=RANDOM_SEED,
-        stratify=y,
+    categorical_columns = determine_categorical_features(X)
+    encoded_X, categorical_mappings = encode_categorical_for_sampling(
+        X, categorical_columns
     )
-    categorical_columns = determine_categorical_features(X_train)
+    categorical_indices = [
+        encoded_X.columns.get_loc(col) for col in categorical_columns if col in encoded_X
+    ]
+    discrete_columns = categorical_columns.copy()
+
+    if split_before:
+        test_size = MODEL_CONFIG.get("test_size", 0.2)
+        X_train, X_test, y_train, y_test = train_test_split(
+            encoded_X,
+            y,
+            test_size=test_size,
+            random_state=RANDOM_SEED,
+            stratify=y,
+        )
+        n_splits = MODEL_CONFIG.get("cv_folds", 5)
+
+        results, samplers = evaluate_all(
+            X_train,
+            y_train,
+            categorical_indices,
+            discrete_columns,
+            n_splits,
+        )
+        summarize_results(results)
+        best_result = choose_best_result(results)
+        best_sampler = samplers[best_result.name]
+        X_best, y_best = best_sampler(X_train.copy(), y_train.copy())
+        best_df = pd.concat(
+            [X_best.reset_index(drop=True), y_best.reset_index(drop=True)],
+            axis=1,
+        )
+        decoded_best_df = decode_categorical_from_sampling(best_df, categorical_mappings)
+
+        logger.info(
+            "Oversampling completed. Train size: %d (oversampled), Test size (untouched): %d",
+            len(X_best),
+            len(X_test),
+        )
+        return decoded_best_df
+
+    if TARGET_COLUMN not in data.columns:
+        raise ValueError(
+            f"Column '{TARGET_COLUMN}' must be present in the dataframe for oversampling."
+        )
+
+    X_train, y_train = encoded_X, y
     n_splits = MODEL_CONFIG.get("cv_folds", 5)
 
-    results, samplers = evaluate_all(X_train, y_train, categorical_columns, n_splits)
+    results, samplers = evaluate_all(
+        X_train,
+        y_train,
+        categorical_indices,
+        discrete_columns,
+        n_splits,
+    )
     summarize_results(results)
     best_result = choose_best_result(results)
     best_sampler = samplers[best_result.name]
@@ -406,13 +523,14 @@ def run_oversampling(df: pd.DataFrame | None = None) -> pd.DataFrame:
         [X_best.reset_index(drop=True), y_best.reset_index(drop=True)],
         axis=1,
     )
+    decoded_best_df = decode_categorical_from_sampling(best_df, categorical_mappings)
 
     logger.info(
-        "Oversampling completed. Train size: %d (oversampled), Test size (untouched): %d",
-        len(X_best),
-        len(X_test),
+        "Oversampling completed on provided dataset. Rows before: %d, after: %d",
+        len(X_train),
+        len(best_df),
     )
-    return best_df
+    return decoded_best_df
 
 if __name__ == "__main__":
     run_oversampling()
