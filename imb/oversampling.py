@@ -92,7 +92,6 @@ class EvaluationResult:
     confusion_matrix: np.ndarray
     visualization_path: Path
 
-
 # ==================== UTILITY FUNCTIONS ====================
 def load_dataset() -> pd.DataFrame:
     """Load preprocessed dataset."""
@@ -267,7 +266,6 @@ def save_confusion_matrix_plot(
     plt.close()
     
     return output_path
-
 
 def macro_auc_pr(
     y_true: np.ndarray,
@@ -688,7 +686,7 @@ def run_oversampling(
     logger.info("Final class distribution:\n%s", validated_df[TARGET_COLUMN].value_counts())
     
     # Save results
-    output_path = OUTPUT_DIR / f"oversampled_{best_result.name.lower()}.csv"
+    output_path = PROCESSED_DATA_DIR / f"oversampled_{best_result.name.lower()}.csv"
     validated_df.to_csv(output_path, index=False)
     logger.info("Saved oversampled dataset to: %s", output_path)
 

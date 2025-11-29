@@ -1,6 +1,17 @@
-from dash import Dash, dcc, html
+import random
+import sys
+from pathlib import Path
+from typing import Dict, Optional
+
 import pandas as pd
 import plotly.express as px
+from flask import Flask, jsonify, request, send_from_directory
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from config import PROCESSED_DATA_PATH
 
 REGION_EAST_ASIA_PACIFIC = "East Asia and Pacific"
 REGION_EUROPE_CENTRAL_ASIA = "Europe and Central Asia"
@@ -30,10 +41,7 @@ REGION_COLOR_MAP = {
     REGION_SOUTH_ASIA: "#C084FC",
 }
 
-NORTH_AMERICA_COUNTRIES = {
-    "Canada",
-    "United States",
-}
+NORTH_AMERICA_COUNTRIES = {"Canada", "United States"}
 
 LATAM_AND_CARIBBEAN_COUNTRIES = {
     "Antigua and Barbuda",
@@ -103,7 +111,7 @@ MENA_AP_COUNTRIES = {
     "Yemen, Rep.",
 }
 
-CENTRAL_ASIA_AND_CAUCAUSUS_COUNTRIES = {
+CENTRAL_ASIA_AND_EU_COUNTRIES = {
     "Armenia",
     "Azerbaijan",
     "Georgia",
@@ -114,123 +122,16 @@ CENTRAL_ASIA_AND_CAUCAUSUS_COUNTRIES = {
     "Uzbekistan",
 }
 
-CARD_BASE_STYLE = {
-    "border": "1px solid #e5e5e5",
-    "borderRadius": "18px",
-    "padding": "24px",
-    "backgroundColor": "#FFFFFF",
-    "boxShadow": "0 20px 40px rgba(15, 57, 95, 0.08)",
+REGION_DESCRIPTIONS = {
+    REGION_EAST_ASIA_PACIFIC: "Rapidly industrializing economies with diversified manufacturing bases and evolving ESG regulations.",
+    REGION_EUROPE_CENTRAL_ASIA: "Highly regulated supply chains with strong sustainability mandates and advanced compliance regimes.",
+    REGION_NORTH_AMERICA: "Mature suppliers with sophisticated risk management and complex multi-tier logistics networks.",
+    REGION_MENA_AP: "Energy-dense trade routes balancing geopolitical considerations with critical mineral exports.",
+    REGION_SUB_SAHARAN: "Resource-rich suppliers with emerging governance practices and infrastructure investment needs.",
+    REGION_LATAM_CARIB: "Agricultural and extractive hubs powering global food and metals supply, often exposed to climate extremes.",
+    REGION_SOUTH_ASIA: "High-growth manufacturing corridor with large labour-intensive supplier bases and maturing ESG standards.",
 }
 
-RISK_LEVELS = [
-    ("High", "#D7263D"),
-    ("Moderate", "#F5A524"),
-    ("Low", "#F7DC6F"),
-    ("Neutral", "#27AE60"),
-]
-
-KEY_METRICS = [
-    ("Total Suppliers by Risk Category", "450"),
-    ("Tons Commodities by Risk Category", "320"),
-]
-
-TOP_RISK_SUPPLIERS = ["Supplier A", "Supplier B", "Supplier C", "Supplier D"]
-
-MODEL_PERFORMANCE = {
-    "Accuracy": "0.85",
-    "F1-score": "0.83",
-    "AUC": "0.88",
-}
-
-SUPPLIER_DETAILS = [
-    ("Supplier A", "China", "Electronics", "Tier 1", "High"),
-    ("Supplier B", "Vietnam", "Textiles", "Tier 2", "Moderate"),
-    ("Supplier C", "Brazil", "Agriculture", "Tier 2", "Low"),
-    ("Supplier D", "Germany", "Automotive", "Tier 1", "Moderate"),
-]
-
-CRITICAL_ALERTS = [
-    "Supplier A – high risk; high emissions",
-    "Supplier F – compliance audit overdue",
-]
-
-RECOMMENDED_ACTIONS = [
-    "Improve supplier audits",
-    "Transition to renewable energy",
-    "Enhance ESG disclosure requirements",
-]
-
-
-def card_container(children, extra_style=None):
-    """Wrap content in a styled dashboard card."""
-    style = CARD_BASE_STYLE.copy()
-    if extra_style:
-        style.update(extra_style)
-    return html.Div(children, style=style)
-
-
-def build_feature_importance_chart():
-    """Bar chart summarizing dummy feature importances."""
-    df = pd.DataFrame(
-        {
-            "Feature": [
-                "Carbon Emissions",
-                "ESG Score",
-                "Geographic Region",
-                "Commodity Type",
-            ],
-            "Importance": [0.9, 0.72, 0.4, 0.35],
-        }
-    )
-    fig = px.bar(
-        df,
-        x="Importance",
-        y="Feature",
-        orientation="h",
-        color="Feature",
-        color_discrete_sequence=["#1abc9c", "#3498db", "#9b59b6", "#f39c12"],
-    )
-    fig.update_layout(
-        showlegend=False,
-        margin=dict(l=0, r=0, t=10, b=10),
-        xaxis_title="Importance",
-        yaxis_title=None,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-    )
-    fig.update_xaxes(range=[0, 1])
-    return fig
-
-
-def build_emission_trend_chart():
-    """Line chart for dummy GHG emission trends."""
-    df = pd.DataFrame(
-        {
-            "Year": [2019, 2020, 2021, 2022, 2023],
-            "North America": [18, 17, 20, 22, 23],
-            "Asia": [12, 14, 15, 17, 18],
-            "Europe": [10, 9, 9, 8, 8],
-        }
-    )
-    long_df = df.melt(id_vars="Year", var_name="Region", value_name="GHG Emissions")
-    fig = px.line(
-        long_df,
-        x="Year",
-        y="GHG Emissions",
-        color="Region",
-        markers=True,
-        color_discrete_sequence=["#1F618D", "#F39C12", "#27AE60"],
-    )
-    fig.update_layout(
-        margin=dict(l=0, r=0, t=10, b=10),
-        yaxis_title="GHG Emissions (mtCO2e)",
-        xaxis_title=None,
-        legend_title_text="Region",
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-    )
-    fig.update_yaxes(range=[5, 25])
-    return fig
 
 def build_region_dataframe() -> pd.DataFrame:
     """Return a dataframe with ISO codes mapped to the custom seven regions."""
@@ -246,7 +147,7 @@ def build_region_dataframe() -> pd.DataFrame:
             return REGION_MENA_AP
         if country in SOUTH_ASIA_COUNTRIES:
             return REGION_SOUTH_ASIA
-        if country in CENTRAL_ASIA_AND_CAUCAUSUS_COUNTRIES:
+        if country in CENTRAL_ASIA_AND_EU_COUNTRIES:
             return REGION_EUROPE_CENTRAL_ASIA
 
         if continent == "Americas":
@@ -273,21 +174,71 @@ def build_region_dataframe() -> pd.DataFrame:
     world_regions = world_regions.drop_duplicates(subset="iso_alpha")
     return world_regions
 
-def build_world_map(data: pd.DataFrame):
-    """Create a choropleth map showing the seven regions."""
+
+WORLD_REGION_DATA = build_region_dataframe()
+
+def load_preprocessed_dataset() -> pd.DataFrame:
+    if PROCESSED_DATA_PATH.exists():
+        return pd.read_csv(PROCESSED_DATA_PATH)
+    return pd.DataFrame()
+
+PREPROCESSED_DATASET = load_preprocessed_dataset()
+
+
+def _figure_to_serialisable(data: Dict) -> Dict:
+    """Recursively convert numpy arrays in Plotly figure to lists."""
+    if isinstance(data, dict):
+        return {key: _figure_to_serialisable(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [_figure_to_serialisable(item) for item in data]
+    if hasattr(data, "tolist"):
+        return data.tolist()
+    return data
+
+
+def build_world_map(
+    data: pd.DataFrame,
+    selected_region: Optional[str] = None,
+) -> Dict:
+    """Create a choropleth map that highlights a selected region."""
+    df = data.copy()
+    muted_label = "Other Regions"
+
+    if selected_region:
+        df["display_region"] = df["region"].apply(
+            lambda region: region if region == selected_region else muted_label
+        )
+        color_map = {muted_label: "#d9d9d9", selected_region: REGION_COLOR_MAP[selected_region]}
+        category_order = [muted_label, selected_region]
+        title = f"{selected_region} Highlighted"
+    else:
+        df["display_region"] = df["region"]
+        color_map = {muted_label: "#d9d9d9", **REGION_COLOR_MAP}
+        category_order = REGION_ORDER
+        title = "Global Regions Overview"
+
     fig = px.choropleth(
-        data_frame=data,
+        data_frame=df,
         locations="iso_alpha",
-        color="region",
+        color="display_region",
         hover_name="country",
-        category_orders={"region": REGION_ORDER},
-        color_discrete_map=REGION_COLOR_MAP,
-        title="Global Regions Overview",
+        hover_data={"region": True},
+        custom_data=["region"],
+        category_orders={"display_region": category_order},
+        color_discrete_map=color_map,
+        title=title,
         projection="natural earth",
     )
     fig.update_layout(
-        margin=dict(l=0, r=0, t=60, b=0),
+        margin=dict(l=0, r=0, t=40, b=0),
         legend_title_text="Region",
+        height=420,
+        title=dict(
+            text=title,
+            font=dict(size=20),
+            x=0.01,
+            xanchor="left",
+        ),
     )
     fig.update_geos(
         showcountries=True,
@@ -295,309 +246,155 @@ def build_world_map(data: pd.DataFrame):
         showland=True,
         landcolor="#F5F5F5",
     )
-    return fig
+    return _figure_to_serialisable(fig.to_dict())
 
-def create_app() -> Dash:
-    """Initialize the Dash application."""
-    data = build_region_dataframe()
-    fig = build_world_map(data)
-    feature_fig = build_feature_importance_chart()
-    ghg_fig = build_emission_trend_chart()
 
-    app = Dash(__name__)
-    app.title = "Risk Regions Map"
-    app.layout = html.Div(
-        [
-            html.H1(
-                "Risk Management in Green Supply Chain Management",
-                style={
-                    "fontSize": "32px",
-                    "marginBottom": "24px",
-                    "letterSpacing": "0.03em",
-                },
-            ),
-            html.Div(
-                [
-                    card_container(
-                        [
-                            dcc.Graph(
-                                id="world-region-map",
-                                figure=fig,
-                                style={"height": "55vh"},
-                            ),
-                            html.Div(
-                                [
-                                    html.Div(
-                                        [
-                                            html.Span(
-                                                style={
-                                                    "display": "inline-block",
-                                                    "width": "12px",
-                                                    "height": "12px",
-                                                    "borderRadius": "50%",
-                                                    "backgroundColor": color,
-                                                    "marginRight": "8px",
-                                                }
-                                            ),
-                                            html.Span(label),
-                                        ],
-                                        style={"display": "flex", "alignItems": "center"},
-                                    )
-                                    for label, color in RISK_LEVELS
-                                ],
-                                style={
-                                    "display": "flex",
-                                    "gap": "20px",
-                                    "marginTop": "10px",
-                                    "color": "#6c6f7d",
-                                    "fontSize": "14px",
-                                },
-                            ),
-                        ],
-                        {"padding": "18px"},
-                    ),
-                    card_container(
-                        [
-                            html.H2(
-                                "Key Risk Metrics",
-                                style={"fontSize": "20px", "marginBottom": "16px"},
-                            ),
-                            html.Div(
-                                [
-                                    html.Div(
-                                        [
-                                            html.P(
-                                                label,
-                                                style={
-                                                    "fontSize": "13px",
-                                                    "textTransform": "uppercase",
-                                                    "letterSpacing": "0.05em",
-                                                    "color": "#7a7d85",
-                                                    "marginBottom": "6px",
-                                                },
-                                            ),
-                                            html.Div(
-                                                value,
-                                                style={
-                                                    "fontSize": "44px",
-                                                    "fontWeight": "600",
-                                                },
-                                            ),
-                                        ],
-                                        style={"marginBottom": "18px"},
-                                    )
-                                    for label, value in KEY_METRICS
-                                ],
-                            ),
-                            html.H3(
-                                "Top 10 High-Risk Suppliers",
-                                style={"fontSize": "16px", "marginTop": "10px"},
-                            ),
-                            html.Ul(
-                                [html.Li(name) for name in TOP_RISK_SUPPLIERS],
-                                style={
-                                    "listStyle": "none",
-                                    "padding": 0,
-                                    "margin": "12px 0 0 0",
-                                    "lineHeight": "1.6",
-                                },
-                            ),
-                        ],
-                    ),
-                ],
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "minmax(0, 2fr) minmax(0, 1fr)",
-                    "gap": "24px",
-                    "width": "100%",
-                },
-            ),
-            html.Div(
-                [
-                    card_container(
-                        [
-                            html.H2(
-                                "Predictive Model Insights",
-                                style={"fontSize": "20px", "marginBottom": "12px"},
-                            ),
-                            dcc.Graph(
-                                id="feature-importance-chart",
-                                figure=feature_fig,
-                                style={"height": "250px"},
-                            ),
-                            html.Div(
-                                [
-                                    html.P(
-                                        "Model Performance",
-                                        style={
-                                            "fontWeight": "600",
-                                            "marginBottom": "8px",
-                                        },
-                                    ),
-                                    html.Div(
-                                        [
-                                            html.Div(
-                                                [
-                                                    html.Span(
-                                                        metric,
-                                                        style={
-                                                            "color": "#7a7d85",
-                                                            "fontSize": "12px",
-                                                            "letterSpacing": "0.08em",
-                                                        },
-                                                    ),
-                                                    html.Strong(
-                                                        value,
-                                                        style={"fontSize": "20px"},
-                                                    ),
-                                                ],
-                                                style={"display": "flex", "flexDirection": "column"},
-                                            )
-                                            for metric, value in MODEL_PERFORMANCE.items()
-                                        ],
-                                        style={
-                                            "display": "flex",
-                                            "gap": "24px",
-                                        },
-                                    ),
-                                ],
-                                style={"marginTop": "10px"},
-                            ),
-                        ],
-                    ),
-                    card_container(
-                        [
-                            html.H2(
-                                "Sustainability Trend Analysis",
-                                style={"fontSize": "20px", "marginBottom": "12px"},
-                            ),
-                            html.P(
-                                "GHG Emission Trends",
-                                style={
-                                    "fontSize": "13px",
-                                    "textTransform": "uppercase",
-                                    "letterSpacing": "0.08em",
-                                    "color": "#7a7d85",
-                                    "marginBottom": "8px",
-                                },
-                            ),
-                            dcc.Graph(
-                                id="ghg-trend-chart",
-                                figure=ghg_fig,
-                                style={"height": "260px"},
-                            ),
-                        ],
-                    ),
-                ],
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
-                    "gap": "24px",
-                    "marginTop": "24px",
-                    "width": "100%",
-                },
-            ),
-            html.Div(
-                [
-                    card_container(
-                        [
-                            html.H2(
-                                "Supplier & Commodity Details",
-                                style={"fontSize": "20px", "marginBottom": "12px"},
-                            ),
-                            html.Table(
-                                [
-                                    html.Thead(
-                                        html.Tr(
-                                            [
-                                                html.Th("Supplier"),
-                                                html.Th("Country"),
-                                                html.Th("Commodity"),
-                                                html.Th("Tier"),
-                                                html.Th("Risk"),
-                                            ]
-                                        )
-                                    ),
-                                    html.Tbody(
-                                        [
-                                            html.Tr(
-                                                [
-                                                    html.Td(supplier),
-                                                    html.Td(country),
-                                                    html.Td(commodity),
-                                                    html.Td(tier),
-                                                    html.Td(risk),
-                                                ]
-                                            )
-                                            for (
-                                                supplier,
-                                                country,
-                                                commodity,
-                                                tier,
-                                                risk,
-                                            ) in SUPPLIER_DETAILS
-                                        ]
-                                    ),
-                                ],
-                                style={
-                                    "width": "100%",
-                                    "borderCollapse": "collapse",
-                                },
-                            ),
-                        ],
-                    ),
-                    card_container(
-                        [
-                            html.H2(
-                                "Decision Support / Alerts",
-                                style={"fontSize": "20px", "marginBottom": "12px"},
-                            ),
-                            html.Ul(
-                                [html.Li(alert) for alert in CRITICAL_ALERTS],
-                                style={
-                                    "paddingLeft": "16px",
-                                    "lineHeight": "1.8",
-                                },
-                            ),
-                        ],
-                    ),
-                    card_container(
-                        [
-                            html.H2(
-                                "Recommended Actions",
-                                style={"fontSize": "20px", "marginBottom": "12px"},
-                            ),
-                            html.Ul(
-                                [html.Li(action) for action in RECOMMENDED_ACTIONS],
-                                style={
-                                    "paddingLeft": "16px",
-                                    "lineHeight": "1.8",
-                                },
-                            ),
-                        ],
-                    ),
-                ],
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)",
-                    "gap": "24px",
-                    "marginTop": "24px",
-                    "width": "100%",
-                },
-            ),
-        ],
-        style={
-            "fontFamily": "'Helvetica Neue', Arial, sans-serif",
-            "padding": "40px 60px 80px",
-            "backgroundColor": "#f4f6fb",
-            "color": "#1c1f24",
-            "minHeight": "100vh",
+def build_region_info(selected_region: Optional[str]) -> Dict:
+    """Return descriptive data for the selected region."""
+    if not selected_region:
+        return {
+            "region": None,
+            "description": "Select a region on the map to focus on its risk profile, supplier distribution, and supporting narrative.",
+            "countries": [],
+            "countryCount": 0,
+            "default": True,
+            "highlights": [
+                "Regions outside the selection are muted in grey.",
+                "Only the chosen region keeps its palette color.",
+                "Country lists update dynamically.",
+            ],
+        }
+
+    subset = WORLD_REGION_DATA[WORLD_REGION_DATA["region"] == selected_region]
+    countries = sorted(subset["country"].tolist())
+    description = REGION_DESCRIPTIONS.get(
+        selected_region, "Regional description not available."
+    )
+    return {
+        "region": selected_region,
+        "description": description,
+        "countries": countries,
+        "countryCount": len(countries),
+        "default": False,
+    }
+
+
+def resolve_region_from_iso(iso_code: Optional[str]) -> Optional[str]:
+    """Return the region name associated with a given ISO alpha-3 code."""
+    if not iso_code:
+        return None
+    match = WORLD_REGION_DATA[WORLD_REGION_DATA["iso_alpha"] == iso_code]
+    if match.empty:
+        return None
+    return match.iloc[0]["region"]
+
+
+DASHBOARD_DIR = Path(__file__).resolve().parent
+HTML_DIR = DASHBOARD_DIR / "html"
+CSS_DIR = DASHBOARD_DIR / "css"
+JS_DIR = DASHBOARD_DIR / "js"
+TABS_DIR = HTML_DIR / "tabs"
+
+app = Flask(__name__)
+
+
+@app.route("/")
+def index():
+    """Serve the main dashboard page."""
+    return send_from_directory(HTML_DIR, "index.html")
+
+@app.route("/tabs/<path:filename>")
+def serve_tab(filename: str):
+    """Serve HTML fragments for tabs."""
+    return send_from_directory(TABS_DIR, filename)
+
+
+@app.route("/css/<path:filename>")
+def serve_css(filename: str):
+    """Serve CSS assets."""
+    return send_from_directory(CSS_DIR, filename)
+
+
+@app.route("/js/<path:filename>")
+def serve_js(filename: str):
+    """Serve JavaScript assets."""
+    return send_from_directory(JS_DIR, filename)
+
+
+@app.route("/api/world-map")
+def api_world_map():
+    """Return the Plotly figure for the world map."""
+    selected_region = request.args.get("selected")
+    figure = build_world_map(WORLD_REGION_DATA, selected_region)
+    return jsonify({"figure": figure})
+
+
+@app.route("/api/region-info")
+def api_region_info():
+    """Return descriptive info for the selected region."""
+    region = request.args.get("region")
+    info = build_region_info(region)
+    return jsonify(info)
+
+
+@app.route("/api/region-from-iso")
+def api_region_from_iso():
+    """Translate an ISO code into its configured region."""
+    iso_code = request.args.get("iso")
+    region = resolve_region_from_iso(iso_code)
+    return jsonify({"region": region})
+
+
+def build_overview_summary() -> Dict:
+    """Compute summary metrics for the overview panel."""
+    random_score = round(random.uniform(60, 95), 1)
+    dataset = PREPROCESSED_DATASET
+    if not dataset.empty and "Supplier_Name" in dataset.columns:
+        total_suppliers = int(dataset["Supplier_Name"].nunique())
+    else:
+        total_suppliers = 0
+
+    if not dataset.empty and "Risk_Classification" in dataset.columns:
+        counts = dataset["Risk_Classification"].value_counts().reindex(
+            ["High", "Moderate", "Low"], fill_value=0
+        )
+    else:
+        counts = pd.Series([1, 1, 1], index=["High", "Moderate", "Low"])
+
+    fig = px.pie(
+        values=counts.values,
+        names=counts.index,
+        hole=0.55,
+        title="Supplier-Commodity Risk Mix",
+        color=counts.index,
+        color_discrete_map={
+            "High": "#fa7066",
+            "Moderate": "#fcaf56",
+            "Low": "#adcf7a",
         },
     )
-    return app
+    fig.update_layout(margin=dict(t=60, b=0, l=0, r=0), legend_title="")
 
-app = create_app()
-server = app.server
+    return {
+        "risk_score": random_score,
+        "total_suppliers": total_suppliers,
+        "donut": _figure_to_serialisable(fig.to_dict()),
+    }
+
+
+@app.route("/api/overview-summary")
+def api_overview_summary():
+    """Provide headline metrics for the overview panel."""
+    summary = build_overview_summary()
+    return jsonify(
+        {
+            "riskScore": summary["risk_score"],
+            "totalSuppliers": summary["total_suppliers"],
+            "donut": summary["donut"],
+        }
+    )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
+

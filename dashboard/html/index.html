@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GSCM Risk Management Dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="/js/app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-container">
+      <header>
+        <h1>Risk Management in Green Supply Chain Management</h1>
+        <p class="subtitle">
+          Click any region to highlight it. Use the reset button to return to the
+          global overview.
+        </p>
+      </header>
+
+      <nav class="tabs" role="tablist">
+        <button
+          class="tab-button active"
+          data-tab="overview"
+          role="tab"
+          aria-controls="tab-overview"
+          aria-selected="true"
+        >
+          Global GSCM Risk Overview
+        </button>
+        <button
+          class="tab-button"
+          data-tab="detailed"
+          role="tab"
+          aria-controls="tab-detailed"
+          aria-selected="false"
+        >
+          Risk Distribution
+        </button>
+        <button
+          class="tab-button"
+          data-tab="metrics"
+          role="tab"
+          aria-controls="tab-metrics"
+          aria-selected="false"
+        >
+          Model Metrics
+        </button>
+      </nav>
+
+      <div id="tab-content" class="tab-content" role="presentation"></div>
+    </div>
+  </body>
+</html>
