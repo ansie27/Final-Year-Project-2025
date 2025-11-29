@@ -37,7 +37,7 @@ from model_evaluation_utils import (
 )
 
 import config
-DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
+DEFAULT_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "ann_results.yaml"
 DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
@@ -61,12 +61,10 @@ def set_random_seeds(seed: Optional[int] = None) -> None:
         torch.manual_seed(resolved_seed)
         torch.cuda.manual_seed_all(resolved_seed)
 
-
 def load_dataset(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Dataset not found at {path}")
     return pd.read_csv(path)
-
 
 def detect_task_type(series: pd.Series, classification_threshold: int = CLASS_THRESHOLD) -> str:
     if series.dtype == object or series.dtype == "category":
@@ -100,7 +98,6 @@ def prepare_features(
 
     features = features.apply(pd.to_numeric, errors="coerce").fillna(0.0)
     return features, target
-
 
 @dataclass
 class DatasetBundle:
@@ -453,19 +450,19 @@ def save_results_yaml(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train an ANN on synthetic engineered dataset.")
-    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to syn_20000_engineered_features.csv")
+    parser = argparse.ArgumentParser(description="Train an ANN on the engineered supplier dataset.")
+    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to engineered_supplier_commodity_features.csv")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
     parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
     parser.add_argument("--backend", type=str, choices=["tensorflow", "pytorch"], default="tensorflow", help="Deep learning backend.")
     parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
     parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--hidden-layers", type=int, nargs="+", default=[256, 128, 64], help="Hidden layer sizes.")
-    parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
-    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate.")
-    parser.add_argument("--epochs", type=int, default=150, help="Maximum training epochs.")
-    parser.add_argument("--batch-size", type=int, default=128, help="Mini-batch size.")
-    parser.add_argument("--patience", type=int, default=15, help="Early stopping patience.")
+    parser.add_argument("--hidden-layers", type=int, nargs="+", default=[512, 256, 128], help="Hidden layer sizes.")
+    parser.add_argument("--dropout", type=float, default=0.25, help="Dropout rate.")
+    parser.add_argument("--learning-rate", type=float, default=3e-4, help="Learning rate.")
+    parser.add_argument("--epochs", type=int, default=200, help="Maximum training epochs.")
+    parser.add_argument("--batch-size", type=int, default=256, help="Mini-batch size.")
+    parser.add_argument("--patience", type=int, default=20, help="Early stopping patience.")
     parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
     parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
     args = parser.parse_args()

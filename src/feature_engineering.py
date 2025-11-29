@@ -1,8 +1,7 @@
-
 import random
 import sys
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Optional
 import numpy as np
 import pandas as pd
 
@@ -10,10 +9,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import OVERSAMPLED_DATA_PATH, RANDOM_SEED
+from config import (
+    DATA_DIR,
+    OVERSAMPLED_DATA_PATH,
+    PROCESSED_DATA_DIR,
+    ENGINEERED_DATA_PATH,
+    RANDOM_SEED,
+)
+import logging
 
-SYNTHETIC_DATA_PATH = config.DATA_DIR / "synthetic" / "syn_20000_data.csv"
-FEATURE_OUTPUT_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
+DEFAULT_INPUT_PATH = PROCESSED_DATA_DIR / "oversampled_smotenc.csv"
+FEATURE_OUTPUT_PATH = Path(ENGINEERED_DATA_PATH)
 
 COMPLIANCE_MAX = 3
 SOCIAL_SCORE_MAX = 100
@@ -21,15 +27,30 @@ FINANCIAL_SCORE_MAX = 100
 ESG_SCORE_MAX = 100
 DEFAULT_FILL_VALUE = np.nan
 
-np.random.seed(config.RANDOM_SEED)
-random.seed(config.RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+random.seed(RANDOM_SEED)
+logger = logging.getLogger(__name__)
 
+
+def resolve_input_dataset() -> Path:
+    """Return the preferred oversampled dataset path, falling back if required."""
+    if DEFAULT_INPUT_PATH.exists():
+        return DEFAULT_INPUT_PATH
+
+    legacy_path = OVERSAMPLED_DATA_PATH
+    if legacy_path.exists():
+        logger.warning("Using legacy oversampled dataset at %s", legacy_path)
+        return legacy_path
+
+    raise FileNotFoundError(
+        "Could not locate an oversampled dataset. "
+        f"Tried {DEFAULT_INPUT_PATH} and {legacy_path}."
+    )
 
 def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     denominator = denominator.astype(float).replace(0, np.nan)
     result = numerator.astype(float).divide(denominator)
     return result.replace([np.inf, -np.inf], np.nan)
-
 
 def _min_max_scale(series: pd.Series) -> pd.Series:
     values = series.astype(float)
@@ -39,18 +60,16 @@ def _min_max_scale(series: pd.Series) -> pd.Series:
         return pd.Series(0.0, index=values.index)
     return (values - min_val) / (max_val - min_val)
 
-
-def _normalize(series: pd.Series, max_value: float) -> pd.Series:
+def _normalise(series: pd.Series, max_value: float) -> pd.Series:
     if max_value == 0:
         return pd.Series(0.0, index=series.index)
     return (series.astype(float) / max_value).clip(lower=0.0, upper=1.0)
 
-
-def load_synthetic_dataset(path: Path = SYNTHETIC_DATA_PATH) -> pd.DataFrame:
-    if not path.exists():
-        raise FileNotFoundError(f"Synthetic dataset not found at {path}")
-    return pd.read_csv(path)
-
+def load_oversampled_dataset(path: Optional[Path] = None) -> pd.DataFrame:
+    dataset_path = path or resolve_input_dataset()
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Oversampled dataset not found at {dataset_path}")
+    return pd.read_csv(dataset_path)
 
 def engineer_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[str]]:
     engineered = df.copy()
@@ -115,16 +134,16 @@ def engineer_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[s
         operational = engineered.get(
             "Operational_Reliability_Index", pd.Series(DEFAULT_FILL_VALUE, index=engineered.index)
         ).fillna(0.0)
-        financial = _normalize(engineered["Financial_Stability_Score"], FINANCIAL_SCORE_MAX)
-        compliance = _normalize(engineered["Compliance_Level"], COMPLIANCE_MAX)
+        financial = _normalise(engineered["Financial_Stability_Score"], FINANCIAL_SCORE_MAX)
+        compliance = _normalise(engineered["Compliance_Level"], COMPLIANCE_MAX)
         _add_feature("Resilience_Score", operational * financial * compliance)
 
     if _require(
         {"ESG_Score", "Compliance_Level", "Carbon_Emission_Intensity", "Cost_Index"},
         "Sustainability_Risk_Index",
     ):
-        esg_component = 1.0 - _normalize(engineered["ESG_Score"], ESG_SCORE_MAX)
-        compliance_component = 1.0 - _normalize(engineered["Compliance_Level"], COMPLIANCE_MAX)
+        esg_component = 1.0 - _normalise(engineered["ESG_Score"], ESG_SCORE_MAX)
+        compliance_component = 1.0 - _normalise(engineered["Compliance_Level"], COMPLIANCE_MAX)
         emission_component = engineered["Carbon_Emission_Intensity"].astype(float).clip(lower=0.0)
         cost_component = engineered["Cost_Index"].astype(float).clip(lower=0.0)
         risk_score = (
@@ -136,15 +155,15 @@ def engineer_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[s
         _add_feature("Sustainability_Risk_Index", (risk_score * 100).clip(0.0, 100.0))
 
     if _require({"ESG_Score", "Compliance_Level"}, "ESG_Compliance_Composite"):
-        esg_norm = _normalize(engineered["ESG_Score"], ESG_SCORE_MAX)
-        compliance_norm = _normalize(engineered["Compliance_Level"], COMPLIANCE_MAX)
+        esg_norm = _normalise(engineered["ESG_Score"], ESG_SCORE_MAX)
+        compliance_norm = _normalise(engineered["Compliance_Level"], COMPLIANCE_MAX)
         _add_feature("ESG_Compliance_Composite", (0.6 * esg_norm + 0.4 * compliance_norm) * 100)
 
     if _require(
         {"Social_Score", "Labour_Compliance_Score", "Diversity_Index"},
         "Social_Responsibility_Score",
     ):
-        social_norm = _normalize(engineered["Social_Score"], SOCIAL_SCORE_MAX)
+        social_norm = _normalise(engineered["Social_Score"], SOCIAL_SCORE_MAX)
         labour_norm = engineered["Labour_Compliance_Score"].astype(float).clip(0.0, 1.0)
         diversity_norm = engineered["Diversity_Index"].astype(float).clip(0.0, 1.0)
         _add_feature(
@@ -197,26 +216,23 @@ def engineer_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[s
 
     return engineered, added, skipped
 
-
 def save_engineered_dataset(df: pd.DataFrame, path: Path = FEATURE_OUTPUT_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
 
-
 def run_feature_engineering_pipeline(
-    input_path: Path = SYNTHETIC_DATA_PATH,
+    input_path: Optional[Path] = None,
     output_path: Path = FEATURE_OUTPUT_PATH,
 ) -> Tuple[pd.DataFrame, List[str], List[str]]:
-    dataset = load_synthetic_dataset(input_path)
+    dataset = load_oversampled_dataset(input_path)
     engineered, added, skipped = engineer_features(dataset)
     save_engineered_dataset(engineered, output_path)
     return engineered, added, skipped
 
-
 def display_feature_engineering_summary(
     features_added: Iterable[str],
     features_skipped: Iterable[str],
-    dataset_name: str = "Synthetic Supplier Dataset",
+    dataset_name: str = "Oversampled Supplier Dataset",
 ) -> None:
     print("\n" + "=" * 70)
     print(f"FEATURE ENGINEERING SUMMARY - {dataset_name}")
@@ -232,12 +248,13 @@ def display_feature_engineering_summary(
             print(f"  [!] {feature}")
     print("=" * 70 + "\n")
 
-
 if __name__ == "__main__":
-    engineered_df, added_features, skipped_features = run_feature_engineering_pipeline()
+    dataset_path = resolve_input_dataset()
+    engineered_df, added_features, skipped_features = run_feature_engineering_pipeline(
+        dataset_path
+    )
     display_feature_engineering_summary(
         added_features,
         skipped_features,
-        dataset_name="syn_20000_data.csv",
+        dataset_name=dataset_path.name,
     )
-

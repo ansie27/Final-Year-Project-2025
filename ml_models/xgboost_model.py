@@ -35,7 +35,7 @@ from model_evaluation_utils import (
     evaluate_classification_metrics,
 )
 
-DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
+DEFAULT_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "xgboost_results.yaml"
 DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
@@ -297,20 +297,20 @@ def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train an XGBoost model on the engineered synthetic dataset.")
-    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to syn_20000_engineered_features.csv")
+    parser = argparse.ArgumentParser(description="Train an XGBoost model on the engineered supplier dataset.")
+    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to engineered_supplier_commodity_features.csv")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
     parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
     parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
     parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--n-estimators", type=int, default=300, help="Number of boosting rounds.")
-    parser.add_argument("--max-depth", type=int, default=6, help="Maximum tree depth.")
-    parser.add_argument("--learning-rate", type=float, default=0.03, help="Learning rate (eta).")
-    parser.add_argument("--subsample", type=float, default=0.8, help="Subsample ratio of the training instances.")
-    parser.add_argument("--colsample-bytree", type=float, default=0.8, help="Subsample ratio of columns when constructing each tree.")
-    parser.add_argument("--min-child-weight", type=float, default=1.0, help="Minimum sum of instance weight (hessian) needed in a child.")
-    parser.add_argument("--reg-lambda", type=float, default=1.0, help="L2 regularization term on weights.")
-    parser.add_argument("--gamma", type=float, default=0.0, help="Minimum loss reduction required to make a further partition.")
+    parser.add_argument("--n-estimators", type=int, default=500, help="Number of boosting rounds.")
+    parser.add_argument("--max-depth", type=int, default=7, help="Maximum tree depth.")
+    parser.add_argument("--learning-rate", type=float, default=0.05, help="Learning rate (eta).")
+    parser.add_argument("--subsample", type=float, default=0.9, help="Subsample ratio of the training instances.")
+    parser.add_argument("--colsample-bytree", type=float, default=0.9, help="Subsample ratio of columns when constructing each tree.")
+    parser.add_argument("--min-child-weight", type=float, default=2.0, help="Minimum sum of instance weight (hessian) needed in a child.")
+    parser.add_argument("--reg-lambda", type=float, default=1.5, help="L2 regularization term on weights.")
+    parser.add_argument("--gamma", type=float, default=0.1, help="Minimum loss reduction required to make a further partition.")
     parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel threads used to run XGBoost.")
     parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
     parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")

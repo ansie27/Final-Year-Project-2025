@@ -3,14 +3,12 @@ import math
 import sys
 from pathlib import Path
 from typing import Dict, Tuple
-
 import yaml
 from prettytable import PrettyTable
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-
 
 DEFAULT_RESULTS = {
     "ANN": PROJECT_ROOT / "outputs" / "models" / "ann_results.yaml",
@@ -29,13 +27,11 @@ METRIC_SPECS = [
     ("top_k", "Top-K", False),
 ]
 
-
 def _load_yaml_metrics(path: Path) -> Dict:
     if not path.exists():
         raise FileNotFoundError(f"Results file not found at {path}")
     with open(path, "r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
-
 
 def _extract_metrics(data: Dict) -> Dict[str, float]:
     metrics = data.get("metrics", {})
@@ -46,7 +42,6 @@ def _extract_metrics(data: Dict) -> Dict[str, float]:
         value = metrics.get(key)
         extracted[key] = float(value) if value is not None else float("nan")
     return extracted
-
 
 def build_summary_table(results_map: Dict[str, Path]) -> Tuple[PrettyTable, Dict[str, Dict[str, float]]]:
     summary: Dict[str, Dict[str, float]] = {}
@@ -61,7 +56,6 @@ def build_summary_table(results_map: Dict[str, Path]) -> Tuple[PrettyTable, Dict
         row = [model_name] + [metrics.get(key, float("nan")) for key, _, _ in METRIC_SPECS]
         table.add_row(row)
     return table, summary
-
 
 def highlight_best_models(summary: Dict[str, Dict[str, float]]) -> Dict[str, str]:
     best: Dict[str, str] = {}
@@ -78,7 +72,6 @@ def highlight_best_models(summary: Dict[str, Dict[str, float]]) -> Dict[str, str
         best_model = max(candidates, key=lambda item: item[1])[0]
         best[label] = best_model
     return best
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare ANN, Random Forest, and XGBoost risk prediction results.")
@@ -126,7 +119,6 @@ def main() -> None:
         for metric_label, model in best_models.items():
             print(f"  - {metric_label}: {model}")
     print(f"\nOverall best-suited model for risk prediction: {overall_best}")
-
 
 if __name__ == "__main__":
     main()
