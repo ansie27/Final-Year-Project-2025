@@ -1,10 +1,8 @@
-from __future__ import annotations
 
 import random
 import sys
 from pathlib import Path
 from typing import Iterable, List, Tuple
-
 import numpy as np
 import pandas as pd
 
@@ -12,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import config
+from config import OVERSAMPLED_DATA_PATH, RANDOM_SEED
 
 SYNTHETIC_DATA_PATH = config.DATA_DIR / "synthetic" / "syn_20000_data.csv"
 FEATURE_OUTPUT_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
