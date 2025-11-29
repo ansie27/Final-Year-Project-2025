@@ -3,8 +3,7 @@ import sys
 from dataclasses import dataclass
 from functools import reduce
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
-
+from typing import Any, Dict, List, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -16,7 +15,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import config
 from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
-from src.utils import ensure_directory, print_progress, print_section_header
 from utils.fuzzy_operations import TriangularFuzzyNumber, calculate_consistency_ratio
 
 ENGINEERED_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
@@ -32,6 +30,19 @@ IDENTIFIER_COLUMNS = {
     "Commodity_Name",
     "Risk_Classification",
 }
+
+
+def ensure_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def print_progress(message: str) -> None:
+    print(f"[Fuzzy AHP] {message}")
+
+
+def print_section_header(title: str) -> None:
+    banner = "=" * len(title)
+    print(f"\n{banner}\n{title}\n{banner}")
 
 RATIO_THRESHOLDS: List[Tuple[float, int]] = [
     (1.15, 1),

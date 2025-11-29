@@ -1,10 +1,12 @@
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
@@ -18,13 +20,24 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from src.utils import ensure_directory, print_section_header, print_progress
+import config
+from ml_models.ann_model import ANNTrainingConfig, run_ann_training
+from ml_models.random_forest_model import (
+    RandomForestTrainingConfig,
+    run_random_forest_training,
+)
+from ml_models.xgboost_model import XGBoostTrainingConfig, run_xgboost_training
+from src.utils import ensure_directory, print_progress, print_section_header
 
 
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "syn_20000_engineered_features.csv"
+DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "visualizations"
 PLOT_PATH = OUTPUT_DIR / "top_10_critical_features.png"
 CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.json"
+SELECTED_FEATURE_DATASET_PATH = (
+    PROJECT_ROOT / "data" / "processed" / "engineered_top10_features_dataset.csv"
+)
+MODEL_COMPARISON_PATH = PROJECT_ROOT / "outputs" / "model_comparison" / "feature_subset_comparison.json"
 TARGET_COLUMN = "Risk_Classification"
 IDENTIFIER_COLUMNS = [
     "Supplier_ID",
@@ -35,6 +48,25 @@ IDENTIFIER_COLUMNS = [
 RANDOM_STATE = 42
 MAX_PFI_ITERATIONS = 5
 PFI_STABILITY_TOLERANCE = 5e-4
+PRIMARY_METRICS_ORDER = [
+    "f1_macro",
+    "balanced_accuracy",
+    "accuracy",
+    "r2",
+    "rmse",
+    "mae",
+]
+LOWER_IS_BETTER = {"rmse", "mae", "mse"}
+BASELINE_RESULT_PATHS: Dict[str, Path] = {
+    "random_forest": config.MODELS_DIR / "random_forest_results.yaml",
+    "xgboost": config.MODELS_DIR / "xgboost_results.yaml",
+    "ann": config.MODELS_DIR / "ann_results.yaml",
+}
+TOP_FEATURE_RESULT_PATHS: Dict[str, Path] = {
+    "random_forest": config.MODELS_DIR / "random_forest_top_features.yaml",
+    "xgboost": config.MODELS_DIR / "xgboost_top_features.yaml",
+    "ann": config.MODELS_DIR / "ann_top_features.yaml",
+}
 
 
 def load_dataset(path: Path) -> pd.DataFrame:
@@ -265,6 +297,136 @@ def save_top_features_json(top_features: pd.DataFrame, output_path: Path) -> Non
     print_progress(f"Saved critical features to {output_path}")
 
 
+def save_selected_feature_dataset(
+    df: pd.DataFrame,
+    selected_features: Sequence[str],
+    target_column: str,
+    output_path: Path,
+) -> Path:
+    missing = [feature for feature in selected_features if feature not in df.columns]
+    if missing:
+        raise ValueError(f"Selected features missing from dataset: {', '.join(missing)}")
+    columns = list(dict.fromkeys([*selected_features, target_column]))
+    subset = df[columns].copy()
+    ensure_directory(output_path.parent)
+    subset.to_csv(output_path, index=False)
+    print_progress(f"Saved selected-feature dataset to {output_path}")
+    return output_path
+
+
+def load_model_results(path: Path, label: str) -> Dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"{label} results file not found at {path}")
+    with path.open("r", encoding="utf-8") as handle:
+        return yaml.safe_load(handle)
+
+
+def retrain_models_with_dataset(dataset_path: Path, suffix: str) -> Dict[str, Dict[str, Any]]:
+    label_fragment = suffix.replace(" ", "_")
+    print_progress(f"Retraining models using dataset '{dataset_path.name}' ({suffix})")
+
+    rf_cfg = RandomForestTrainingConfig(
+        data_path=dataset_path,
+        output_path=TOP_FEATURE_RESULT_PATHS["random_forest"],
+    )
+    rf_result = run_random_forest_training(rf_cfg)
+
+    xgb_cfg = XGBoostTrainingConfig(
+        data_path=dataset_path,
+        output_path=TOP_FEATURE_RESULT_PATHS["xgboost"],
+    )
+    xgb_result = run_xgboost_training(xgb_cfg)
+
+    ann_cfg = ANNTrainingConfig(
+        data_path=dataset_path,
+        output_path=TOP_FEATURE_RESULT_PATHS["ann"],
+    )
+    ann_result = run_ann_training(ann_cfg)
+
+    return {
+        "random_forest": rf_result,
+        "xgboost": xgb_result,
+        "ann": ann_result,
+    }
+
+
+def load_baseline_model_suite() -> Dict[str, Dict[str, Any]]:
+    return {
+        "random_forest": load_model_results(BASELINE_RESULT_PATHS["random_forest"], "Random Forest"),
+        "xgboost": load_model_results(BASELINE_RESULT_PATHS["xgboost"], "XGBoost"),
+        "ann": load_model_results(BASELINE_RESULT_PATHS["ann"], "ANN"),
+    }
+
+
+def extract_primary_metric(result: Dict[str, Any]) -> Tuple[Optional[str], Optional[float]]:
+    metrics = result.get("metrics", {}).get("test", {})
+    for metric in PRIMARY_METRICS_ORDER:
+        if metric in metrics:
+            return metric, float(metrics[metric])
+    for metric, value in metrics.items():
+        if isinstance(value, (int, float)):
+            return metric, float(value)
+    return None, None
+
+
+def compare_model_performance(
+    baseline_suite: Dict[str, Dict[str, Any]],
+    subset_suite: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    comparisons: Dict[str, Dict[str, Any]] = {}
+    improvement_notes: List[str] = []
+    degradation_notes: List[str] = []
+
+    for model_key, baseline_result in baseline_suite.items():
+        subset_result = subset_suite.get(model_key)
+        if subset_result is None:
+            continue
+        metric_name, baseline_value = extract_primary_metric(baseline_result)
+        _, subset_value = extract_primary_metric(subset_result)
+        if metric_name is None or baseline_value is None or subset_value is None:
+            continue
+        direction = -1.0 if metric_name in LOWER_IS_BETTER else 1.0
+        raw_delta = subset_value - baseline_value
+        directional_delta = raw_delta * direction
+
+        if directional_delta > 0:
+            improvement_notes.append(f"{model_key} (+{abs(raw_delta):.4f} {metric_name})")
+        elif directional_delta < 0:
+            degradation_notes.append(f"{model_key} (-{abs(raw_delta):.4f} {metric_name})")
+
+        comparisons[model_key] = {
+            "metric": metric_name,
+            "all_features": baseline_value,
+            "top_features": subset_value,
+            "difference": raw_delta,
+            "directional_improvement": directional_delta,
+        }
+
+    if improvement_notes and not degradation_notes:
+        conclusion = "All models improved when restricted to the top-10 features."
+    elif degradation_notes and not improvement_notes:
+        conclusion = "All models underperformed when limited to the top-10 features."
+    elif improvement_notes or degradation_notes:
+        conclusion = (
+            "Mixed impact: "
+            + ("improvements in " + ", ".join(improvement_notes) if improvement_notes else "")
+            + ("; degradations in " + ", ".join(degradation_notes) if degradation_notes else "")
+        )
+    else:
+        conclusion = "No measurable performance change between full and top-10 feature sets."
+
+    return {
+        "models": comparisons,
+        "conclusion": conclusion,
+    }
+
+
+def persist_comparison_summary(summary: Dict[str, Any], path: Path) -> None:
+    ensure_directory(path.parent)
+    path.write_text(json.dumps(summary, indent=2))
+    print_progress(f"Performance comparison saved to {path}")
+
+
 def run_feature_selection() -> None:
     """Execute the full permutation feature importance workflow."""
     print_section_header("Permutation Feature Importance Analysis")
@@ -301,10 +463,28 @@ def run_feature_selection() -> None:
         numeric_cols,
     )
 
-    top_10 = importance_df.head(10)
+    top_10 = importance_df.head(10).reset_index(drop=True)
     save_top_features_json(top_10, CRITICAL_FEATURES_PATH)
     display_summary(top_10)
     plot_top_features(top_10, PLOT_PATH)
+
+    selected_features = top_10["feature"].tolist()
+    save_selected_feature_dataset(df, selected_features, TARGET_COLUMN, SELECTED_FEATURE_DATASET_PATH)
+
+    baseline_suite = load_baseline_model_suite()
+    subset_suite = retrain_models_with_dataset(SELECTED_FEATURE_DATASET_PATH, "top_features")
+    comparison_summary = compare_model_performance(baseline_suite, subset_suite)
+    persist_comparison_summary(comparison_summary, MODEL_COMPARISON_PATH)
+
+    print_section_header("Model performance: All features vs Top-10 subset")
+    for model_key, details in comparison_summary["models"].items():
+        delta = details["difference"]
+        metric = details["metric"]
+        print(
+            f"{model_key.title():<15} | {metric}: full={details['all_features']:.4f} "
+            f"vs top10={details['top_features']:.4f} (Δ={delta:+.4f})"
+        )
+    print_progress(comparison_summary["conclusion"])
 
 
 def main() -> None:
