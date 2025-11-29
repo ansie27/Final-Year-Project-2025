@@ -1,4 +1,3 @@
-import argparse
 import os
 import random
 import sys
@@ -46,6 +45,26 @@ IDENTIFIER_COLUMNS = [
     "Commodity_Name",
 ]
 MODEL_LABEL = "XGBoost"
+
+
+@dataclass
+class XGBoostTrainingConfig:
+    data_path: Path = DEFAULT_DATA_PATH
+    output_path: Path = DEFAULT_OUTPUT_PATH
+    target_column: str = DEFAULT_TARGET
+    test_size: float = 0.2
+    val_size: float = 0.1
+    n_estimators: int = 500
+    max_depth: int = 7
+    learning_rate: float = 0.05
+    subsample: float = 0.9
+    colsample_bytree: float = 0.9
+    min_child_weight: float = 2.0
+    reg_lambda: float = 1.5
+    gamma: float = 0.1
+    n_jobs: int = -1
+    positive_class: str = "High"
+    top_k: int = 500
 
 
 def set_random_seed(seed: Optional[int] = None) -> None:
@@ -296,56 +315,49 @@ def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
         yaml.safe_dump(serializable_payload, handle, sort_keys=False)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Train an XGBoost model on the engineered supplier dataset.")
-    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to engineered_supplier_commodity_features.csv")
-    parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
-    parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
-    parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
-    parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--n-estimators", type=int, default=500, help="Number of boosting rounds.")
-    parser.add_argument("--max-depth", type=int, default=7, help="Maximum tree depth.")
-    parser.add_argument("--learning-rate", type=float, default=0.05, help="Learning rate (eta).")
-    parser.add_argument("--subsample", type=float, default=0.9, help="Subsample ratio of the training instances.")
-    parser.add_argument("--colsample-bytree", type=float, default=0.9, help="Subsample ratio of columns when constructing each tree.")
-    parser.add_argument("--min-child-weight", type=float, default=2.0, help="Minimum sum of instance weight (hessian) needed in a child.")
-    parser.add_argument("--reg-lambda", type=float, default=1.5, help="L2 regularization term on weights.")
-    parser.add_argument("--gamma", type=float, default=0.1, help="Minimum loss reduction required to make a further partition.")
-    parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel threads used to run XGBoost.")
-    parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
-    parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
-    args = parser.parse_args()
+def save_booster(booster: xgb.Booster, label: str) -> Path:
+    artifact_name = label.lower().replace(" ", "_")
+    file_path = PROJECT_ROOT / f"{artifact_name}.json"
+    booster.save_model(file_path)
+    return file_path
 
+
+def run_xgboost_training(cfg: Optional[XGBoostTrainingConfig] = None) -> Dict[str, Any]:
+    cfg = cfg or XGBoostTrainingConfig()
     set_random_seed(config.RANDOM_SEED)
 
-    dataset = load_dataset(args.data_path)
-    if args.target_column not in dataset.columns:
+    data_path = Path(cfg.data_path)
+    output_path = Path(cfg.output_path)
+    target_column = cfg.target_column
+
+    dataset = load_dataset(data_path)
+    if target_column not in dataset.columns:
         fallback_column = "Risk_Classification" if "Risk_Classification" in dataset.columns else None
         if fallback_column is None:
-            raise ValueError(f"Target column '{args.target_column}' not found and no fallback target is available.")
-        print(f"[!] Target '{args.target_column}' not found. Falling back to '{fallback_column}'.")
-        args.target_column = fallback_column
+            raise ValueError(f"Target column '{target_column}' not found and no fallback target is available.")
+        print(f"[!] Target '{target_column}' not found. Falling back to '{fallback_column}'.")
+        target_column = fallback_column
 
-    features, target = prepare_features(dataset, args.target_column)
+    features, target = prepare_features(dataset, target_column)
     bundle = create_data_bundle(
         features=features,
         target=target,
-        test_size=args.test_size,
-        val_size=args.val_size,
+        test_size=cfg.test_size,
+        val_size=cfg.val_size,
         random_state=config.RANDOM_SEED,
     )
 
     booster, evals_result, val_metrics, test_metrics = train_xgboost(
         bundle=bundle,
-        max_depth=args.max_depth,
-        learning_rate=args.learning_rate,
-        subsample=args.subsample,
-        colsample_bytree=args.colsample_bytree,
-        min_child_weight=args.min_child_weight,
-        n_estimators=args.n_estimators,
-        reg_lambda=args.reg_lambda,
-        gamma=args.gamma,
-        n_jobs=args.n_jobs,
+        max_depth=cfg.max_depth,
+        learning_rate=cfg.learning_rate,
+        subsample=cfg.subsample,
+        colsample_bytree=cfg.colsample_bytree,
+        min_child_weight=cfg.min_child_weight,
+        n_estimators=cfg.n_estimators,
+        reg_lambda=cfg.reg_lambda,
+        gamma=cfg.gamma,
+        n_jobs=cfg.n_jobs,
     )
     evaluation_details = None
     if bundle.task_type == "classification":
@@ -357,34 +369,34 @@ def main() -> None:
             bundle.y_test,
             probabilities,
             bundle.class_names,
-            args.positive_class,
-            args.top_k,
+            cfg.positive_class,
+            cfg.top_k,
         )
         test_metrics.update(extra_metrics)
 
     payload: Dict[str, Any] = {
         "dataset": {
-            "path": str(Path(args.data_path).resolve()),
+            "path": str(data_path.resolve()),
             "num_rows": int(len(dataset)),
             "num_features": len(bundle.feature_names),
-            "target_column": args.target_column,
+            "target_column": target_column,
             "task_type": bundle.task_type,
             "class_names": bundle.class_names,
         },
         "training": {
             "model": "XGBoost",
-            "n_estimators": args.n_estimators,
-            "max_depth": args.max_depth,
-            "learning_rate": args.learning_rate,
-            "subsample": args.subsample,
-            "colsample_bytree": args.colsample_bytree,
-            "min_child_weight": args.min_child_weight,
-            "reg_lambda": args.reg_lambda,
-            "gamma": args.gamma,
-            "n_jobs": args.n_jobs,
+            "n_estimators": cfg.n_estimators,
+            "max_depth": cfg.max_depth,
+            "learning_rate": cfg.learning_rate,
+            "subsample": cfg.subsample,
+            "colsample_bytree": cfg.colsample_bytree,
+            "min_child_weight": cfg.min_child_weight,
+            "reg_lambda": cfg.reg_lambda,
+            "gamma": cfg.gamma,
+            "n_jobs": cfg.n_jobs,
             "random_seed": config.RANDOM_SEED,
-            "test_size": args.test_size,
-            "val_size": args.val_size,
+            "test_size": cfg.test_size,
+            "val_size": cfg.val_size,
         },
         "metrics": {
             "validation": val_metrics,
@@ -397,8 +409,16 @@ def main() -> None:
     if evaluation_details:
         payload["evaluation"] = evaluation_details
 
-    save_results_yaml(args.output_path, payload)
-    print(f"[+] XGBoost training complete. Results saved to {args.output_path}")
+    artifact_path = save_booster(booster, MODEL_LABEL)
+    payload["model_artifact"] = str(artifact_path)
+
+    save_results_yaml(output_path, payload)
+    print(f"[+] XGBoost training complete. Results saved to {output_path}")
+    return payload
+
+
+def main() -> None:
+    run_xgboost_training()
 
 
 if __name__ == "__main__":
