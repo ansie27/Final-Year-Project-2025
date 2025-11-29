@@ -2,7 +2,8 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
+
 import numpy as np
 import pandas as pd
 from prettytable import PrettyTable
@@ -11,15 +12,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
+import config
+from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
 from src.utils import ensure_directory, print_progress, print_section_header
 from utils.fuzzy_operations import TriangularFuzzyNumber, vertex_distance
 
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "syn_20000_engineered_features.csv"
+DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 WEIGHTS_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_weights.json"
 RANKING_OUTPUT_PATH = PROJECT_ROOT / "data" / "ranked" / "final_supplier_commodity_ranking.json"
 RANDOM_STATE = 42
 
 IDENTIFIER_COLUMNS = [
+    "SC_ID",
     "Supplier_ID",
     "Supplier_Name",
     "Commodity_ID",
@@ -178,70 +182,21 @@ def ga_optimise_weights(
     normalised_matrix: np.ndarray,
     target_scores: np.ndarray,
     seed_weights: np.ndarray,
-    # generations: int = 60,
-    generations: int = 10,
-    population_size: int = 40,
-    mutation_rate: float = 0.2,
-    crossover_rate: float = 0.8,
     random_state: int = RANDOM_STATE,
 ) -> np.ndarray:
-    rng = np.random.default_rng(random_state)
-    n_criteria = normalised_matrix.shape[1]
-
-    def initialise_population() -> np.ndarray:
-        base = rng.random((population_size, n_criteria)) + 1e-6
-        base[0] = seed_weights
-        return base / base.sum(axis=1, keepdims=True)
+    params = GAParameters(random_state=random_state, generations=40)
+    optimizer = WeightGAOptimizer(params)
 
     def fitness(candidate: np.ndarray) -> float:
+        candidate = candidate / candidate.sum()
         scores, _, _ = perform_fuzzy_topsis(normalised_matrix, candidate)
         correlation = spearman_correlation(scores, target_scores)
         if np.isnan(correlation):
             correlation = -1.0
         return -correlation  # minimise negative correlation (maximise stability)
 
-    def select_parent(population: np.ndarray, scores: np.ndarray, k: int = 3) -> np.ndarray:
-        idx = rng.choice(population_size, size=k, replace=False)
-        best_idx = idx[np.argmin(scores[idx])]
-        return population[best_idx]
-
-    def crossover(parent1: np.ndarray, parent2: np.ndarray) -> np.ndarray:
-        alpha = rng.random()
-        child = alpha * parent1 + (1 - alpha) * parent2
-        return child / child.sum()
-
-    def mutate(candidate: np.ndarray) -> np.ndarray:
-        noise = rng.lognormal(mean=0.0, sigma=0.2, size=candidate.shape)
-        mutated = candidate * (1 + mutation_rate * (noise - 1))
-        mutated = np.clip(mutated, 1e-6, None)
-        return mutated / mutated.sum()
-
-    population = initialise_population()
-    best = population[0]
-    best_score = fitness(best)
     print_progress("GA optimisation started")
-
-    for generation in range(generations):
-        scores = np.array([fitness(individual) for individual in population])
-        if scores.min() < best_score:
-            best = population[scores.argmin()]
-            best_score = scores.min()
-        if generation % 5 == 0:
-            print_progress(f"GA generation {generation}: best stability {-best_score:.4f}")
-
-        new_population = []
-        while len(new_population) < population_size:
-            parent1 = select_parent(population, scores)
-            parent2 = select_parent(population, scores)
-            child = parent1.copy()
-            if rng.random() < crossover_rate:
-                child = crossover(parent1, parent2)
-            if rng.random() < mutation_rate:
-                child = mutate(child)
-            new_population.append(child)
-        population = np.array(new_population)
-
-    return best / best.sum()
+    return optimizer.optimise(seed_weights, fitness)
 
 
 def serialize_tfn(tfn: TriangularFuzzyNumber) -> Tuple[float, float, float]:
@@ -320,15 +275,18 @@ def save_rankings_json(
     print_progress(f"Saved final ranking to {output_path}")
 
 
-def run_fuzzy_topsis() -> None:
+def run_fuzzy_topsis(
+    weights_data: Optional[Dict[str, Dict[str, Sequence[Dict[str, float]]]]] = None,
+    data_path: Path = DATA_PATH,
+) -> Dict[str, Any]:
     print_section_header("Fuzzy TOPSIS Analysis")
     print_progress("Loading weights and dataset")
-    weights_data = load_weights(WEIGHTS_PATH)
+    weights_data = weights_data or load_weights(WEIGHTS_PATH)
     standard_weight_entries = weights_data["standard"]["weights"]
     features = [entry["feature"] for entry in standard_weight_entries]
 
     required_columns = features + IDENTIFIER_COLUMNS
-    df = load_dataset(DATA_PATH, required_columns)
+    df = load_dataset(data_path, required_columns)
 
     prepared_df = fill_missing_values(df, features)
     encoded_df = encode_features(prepared_df, features)
@@ -374,6 +332,21 @@ def run_fuzzy_topsis() -> None:
     print(table)
 
     save_rankings_json(standard_rankings, ga_rankings, fpis, fnis, RANKING_OUTPUT_PATH)
+
+    return {
+        "features": features,
+        "suppliers": suppliers,
+        "commodities": commodities,
+        "standard_scores": standard_closeness,
+        "ga_scores": ga_closeness,
+        "standard_rankings": standard_rankings,
+        "ga_rankings": ga_rankings,
+        "weights_used": {
+            "standard": standard_weights,
+            "ga_seed": ga_seed_weights,
+            "ga_optimised": ga_optimised_weights,
+        },
+    }
 
 
 def main() -> None:
