@@ -443,7 +443,8 @@ def _map_industry_sector(df: pd.DataFrame) -> pd.DataFrame:
     tmp_df[column] = tmp_df[column].map(_map_value)
     return tmp_df
 
-
+# Impute missing values with median
+# Handle 'Certifications_Active' column
 def _impute_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     """Fill missing numeric values with geographic medians falling back to global median."""
     tmp_df = df.copy()
@@ -451,8 +452,11 @@ def _impute_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         if column not in tmp_df.columns or not tmp_df[column].isna().any():
             continue
         tmp_df = _fill_with_geographic_median(tmp_df, column)
+    for column in ["Certifications_Active"]:
+        if column not in tmp_df.columns or not tmp_df[column].isna().any():
+            continue
+        tmp_df[column] = tmp_df[column].fillna("None")
     return tmp_df
-
 
 def _fill_with_geographic_median(df: pd.DataFrame, column: str) -> pd.DataFrame:
     tmp_df = df.copy()
