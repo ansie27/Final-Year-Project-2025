@@ -3,8 +3,6 @@
 # Techniques to be tested:
 # 1. SMOTENC
 # 2. ADASYN
-# 3. CTGAN
-# 4. TVAE
 
 import logging
 import warnings
@@ -29,14 +27,11 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import ADASYN, SMOTENC
-from sdv.metadata import SingleTableMetadata
-from sdv.single_table import CTGANSynthesizer, TVAESynthesizer
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from utils.syn_evaluation import SyntheticDataEvaluator
 from config import (
     FEATURE_COLUMNS,
     MODEL_CONFIG,
@@ -51,7 +46,6 @@ warnings.filterwarnings("ignore")
 
 # ==================== CONFIGURATION ====================
 TARGET_COLUMN = "Risk_Classification"
-GAN_EPOCHS = 150
 
 CLASSIFIER_CONFIG = {
     "n_estimators": 300,
@@ -65,12 +59,6 @@ CLASSIFIER_CONFIG = {
 IMBLEARN_SAMPLER_CONFIG = {
     "random_state": RANDOM_SEED,
     "sampling_strategy": "auto",
-}
-
-GAN_SAMPLER_CONFIG = {
-    "epochs": GAN_EPOCHS,
-    "batch_size": 512,
-    "verbose": False,
 }
 
 # Constraint columns that must maintain valid combinations
@@ -92,7 +80,6 @@ class EvaluationResult:
     confusion_matrix: np.ndarray
     visualization_path: Path
 
-
 # ==================== UTILITY FUNCTIONS ====================
 def load_dataset() -> pd.DataFrame:
     """Load preprocessed dataset."""
@@ -108,7 +95,6 @@ def ensure_directories() -> None:
     VISUALIZATIONS_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 
 def select_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
     available_features = [
@@ -128,7 +114,6 @@ def select_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
     y = df[TARGET_COLUMN].astype(str).copy()
     
     return X, y
-
 
 def determine_categorical_features(X: pd.DataFrame) -> List[str]:
     """Identify categorical columns in the dataset."""
@@ -155,11 +140,11 @@ def determine_categorical_features(X: pd.DataFrame) -> List[str]:
     
     return categorical
 
+# Encode categorical columns for oversampling purposes
 def encode_categorical_features(
     X: pd.DataFrame,
     categorical_columns: List[str]
 ) -> Tuple[pd.DataFrame, Dict[str, pd.Index]]:
-    """Encode categorical columns as integers for sampling."""
     if not categorical_columns:
         return X.copy().astype(float), {}
     
@@ -234,12 +219,22 @@ def validate_supplier_location_combinations(
     
     return valid_df
 
+# Reassign SC_ID columns after oversampling
+def add_sc_id_column(df: pd.DataFrame, start_from: int = 1) -> pd.DataFrame:
 
+    num_records = len(df)
+    sc_ids = [f"SC{str(i).zfill(7)}" for i in range(start_from, start_from + num_records)]
+
+    df_with_id = df.copy()
+    df_with_id.insert(0, 'SC_ID', sc_ids)
+    
+    logger.info("Added SC_ID column: %s to %s", sc_ids[0], sc_ids[-1])
+    
+    return df_with_id
 # ==================== EVALUATION ====================
 def build_classifier() -> RandomForestClassifier:
     """Build Random Forest classifier for evaluation."""
     return RandomForestClassifier(**CLASSIFIER_CONFIG)
-
 
 def save_confusion_matrix_plot(
     matrix: np.ndarray,
@@ -268,7 +263,6 @@ def save_confusion_matrix_plot(
     
     return output_path
 
-
 def macro_auc_pr(
     y_true: np.ndarray,
     y_proba: np.ndarray,
@@ -294,7 +288,6 @@ def macro_auc_pr(
         scores.append(score)
     
     return float(np.mean(scores)) if scores else 0.0
-
 
 def evaluate_sampler(
     name: str,
@@ -363,32 +356,85 @@ def evaluate_sampler(
         visualization_path=viz_path,
     )
 
+def calculate_balanced_sampling_strategy(
+    y: pd.Series,
+    min_total_samples: int = 50000,
+    balance_method: str = "proportional"
+) -> Dict[str, int]:
+    class_counts = y.value_counts().to_dict()
+    n_classes = len(class_counts)
+    
+    logger.info("Original class distribution:")
+    for cls, count in class_counts.items():
+        logger.info("  %s: %d (%.1f%%)", cls, count, (count/len(y))*100)
+    
+    if balance_method == "equal":
+        target_per_class = max(
+            max(class_counts.values()),  
+            min_total_samples // n_classes  
+        )
+        
+        sampling_strategy = {cls: target_per_class for cls in class_counts.keys()}
+        
+    elif balance_method == "proportional":
+        majority_count = max(class_counts.values())
+        target_minority = int(majority_count * 0.8)
+        
+        sampling_strategy = {}
+        for cls, count in class_counts.items():
+            if count < target_minority:
+                sampling_strategy[cls] = target_minority
+            else:
+                sampling_strategy[cls] = count
+        
+        # Check if we need more samples to reach min_total_samples
+        total_after = sum(sampling_strategy.values())
+        if total_after < min_total_samples:
+            # Scale up all classes proportionally
+            scale_factor = min_total_samples / total_after
+            sampling_strategy = {
+                cls: int(count * scale_factor) 
+                for cls, count in sampling_strategy.items()
+            }
+    
+    else:
+        raise ValueError(f"Unknown balance_method: {balance_method}")
+    
+    total_target = sum(sampling_strategy.values())
+    logger.info("\nTarget class distribution:")
+    for cls, count in sampling_strategy.items():
+        logger.info("  %s: %d (%.1f%%)", cls, count, (count/total_target)*100)
+    logger.info("Total target samples: %d", total_target)
+    
+    return sampling_strategy
 
 # ==================== OVERSAMPLING TECHNIQUES ====================
 def create_smotenc_sampler(
     categorical_indices: List[int],
-    config: Dict,
+    sampling_strategy: Dict[str, int],
+    random_state: int,
 ) -> Callable:
-    """Create SMOTENC sampler."""
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         sampler = SMOTENC(
             categorical_features=categorical_indices,
-            sampling_strategy=config["sampling_strategy"],
-            random_state=config["random_state"],
-            k_neighbors=min(5, len(y) - 1),  # Prevent errors with small datasets
+            sampling_strategy=sampling_strategy,
+            random_state=random_state,
+            k_neighbors=min(5, len(y) - 1),
         )
         X_res, y_res = sampler.fit_resample(X, y)
         return pd.DataFrame(X_res, columns=X.columns), pd.Series(y_res, name=y.name)
     
     return _sampler
 
-
-def create_adasyn_sampler(config: Dict) -> Callable:
-    """Create ADASYN sampler."""
+def create_adasyn_sampler(
+    sampling_strategy: Dict[str, int],
+    random_state: int,
+) -> Callable:
+    """Create ADASYN sampler with custom sampling strategy."""
     def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
         sampler = ADASYN(
-            random_state=config["random_state"],
-            sampling_strategy=config["sampling_strategy"],
+            random_state=random_state,
+            sampling_strategy=sampling_strategy,
             n_neighbors=min(5, len(y) - 1),
         )
         X_res, y_res = sampler.fit_resample(X, y)
@@ -396,149 +442,25 @@ def create_adasyn_sampler(config: Dict) -> Callable:
     
     return _sampler
 
-
-def create_ctgan_sampler(
-    feature_columns: List[str],
-    discrete_columns: List[str],
-    target_column: str,
-    config: Dict,
-) -> Callable:
-    """Create CTGAN sampler."""
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        train_df = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
-        
-        # Setup metadata
-        metadata = SingleTableMetadata()
-        metadata.detect_from_dataframe(train_df)
-        
-        for col in discrete_columns + [target_column]:
-            if col in train_df.columns:
-                metadata.update_column(column_name=col, sdtype="categorical")
-        
-        # Train CTGAN
-        model = CTGANSynthesizer(
-            metadata=metadata,
-            epochs=config["epochs"],
-            verbose=config["verbose"],
-            batch_size=min(config["batch_size"], len(train_df)),
-        )
-        model.fit(train_df)
-        
-        # Generate synthetic samples for minority classes
-        counts = y.value_counts()
-        max_count = counts.max()
-        synthetic_parts = []
-        
-        for label, count in counts.items():
-            deficit = int(max_count - count)
-            if deficit <= 0:
-                continue
-            
-            condition_df = pd.DataFrame({target_column: [label] * deficit})
-            synthetic = model.sample_from_conditions(conditions=condition_df)
-            synthetic_parts.append(synthetic)
-        
-        if synthetic_parts:
-            synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-            augmented_df = pd.concat([train_df, synthetic_df], ignore_index=True)
-        else:
-            augmented_df = train_df
-        
-        X_aug = augmented_df[feature_columns].copy()
-        y_aug = augmented_df[target_column].copy()
-        
-        # Ensure numeric
-        for col in X_aug.columns:
-            X_aug[col] = pd.to_numeric(X_aug[col], errors="coerce")
-        
-        return X_aug, y_aug
-    
-    return _sampler
-
-
-def create_tvae_sampler(
-    feature_columns: List[str],
-    discrete_columns: List[str],
-    target_column: str,
-    config: Dict,
-) -> Callable:
-    """Create TVAE sampler."""
-    def _sampler(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-        train_df = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
-        
-        # Setup metadata
-        metadata = SingleTableMetadata()
-        metadata.detect_from_dataframe(train_df)
-        
-        for col in discrete_columns + [target_column]:
-            if col in train_df.columns:
-                metadata.update_column(column_name=col, sdtype="categorical")
-        
-        # Train TVAE
-        model = TVAESynthesizer(
-            metadata=metadata,
-            epochs=config["epochs"],
-            verbose=config["verbose"],
-            batch_size=min(config["batch_size"], len(train_df)),
-        )
-        model.fit(train_df)
-        
-        # Generate synthetic samples for minority classes
-        counts = y.value_counts()
-        max_count = counts.max()
-        synthetic_parts = []
-        
-        for label, count in counts.items():
-            deficit = int(max_count - count)
-            if deficit <= 0:
-                continue
-            
-            condition_df = pd.DataFrame({target_column: [label] * deficit})
-            synthetic = model.sample_from_conditions(conditions=condition_df)
-            synthetic_parts.append(synthetic)
-        
-        if synthetic_parts:
-            synthetic_df = pd.concat(synthetic_parts, ignore_index=True)
-            augmented_df = pd.concat([train_df, synthetic_df], ignore_index=True)
-        else:
-            augmented_df = train_df
-        
-        X_aug = augmented_df[feature_columns].copy()
-        y_aug = augmented_df[target_column].copy()
-        
-        # Ensure numeric
-        for col in X_aug.columns:
-            X_aug[col] = pd.to_numeric(X_aug[col], errors="coerce")
-        
-        return X_aug, y_aug
-    
-    return _sampler
-
-
 # ==================== MAIN WORKFLOW ====================
 def evaluate_all_samplers(
     X: pd.DataFrame,
     y: pd.Series,
     categorical_indices: List[int],
-    discrete_columns: List[str],
+    sampling_strategy: Dict[str, int],
     n_splits: int,
 ) -> Tuple[List[EvaluationResult], Dict[str, Callable]]:
     """Evaluate all oversampling techniques."""
     
     samplers = {
-        "SMOTENC": create_smotenc_sampler(categorical_indices, IMBLEARN_SAMPLER_CONFIG),
-        "ADASYN": create_adasyn_sampler(IMBLEARN_SAMPLER_CONFIG),
-        "CTGAN": create_ctgan_sampler(
-            list(X.columns),
-            discrete_columns,
-            TARGET_COLUMN,
-            GAN_SAMPLER_CONFIG,
+        "SMOTENC": create_smotenc_sampler(
+            categorical_indices, 
+            sampling_strategy,
+            RANDOM_SEED
         ),
-        "TVAE": create_tvae_sampler(
-            list(X.columns),
-            discrete_columns,
-            TARGET_COLUMN,
-            GAN_SAMPLER_CONFIG,
+        "ADASYN": create_adasyn_sampler(
+            sampling_strategy,
+            RANDOM_SEED
         ),
     }
     
@@ -546,10 +468,10 @@ def evaluate_all_samplers(
     results = []
     
     for name, sampler_fn in samplers.items():
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("EVALUATING: %s", name.upper())
-        logger.info("="*60)
-        
+        logger.info("=" * 60)
+
         try:
             result = evaluate_sampler(name, sampler_fn, X, y, class_labels, n_splits)
             results.append(result)
@@ -558,9 +480,7 @@ def evaluate_all_samplers(
     
     return results, samplers
 
-
-def summarize_results(results: List[EvaluationResult]) -> None:
-    """Display results in formatted table."""
+def summarise_results(results: List[EvaluationResult]) -> None:
     if not results:
         logger.error("No results to display")
         return
@@ -588,7 +508,6 @@ def summarize_results(results: List[EvaluationResult]) -> None:
     print(table)
     print("="*80)
 
-
 def choose_best_technique(results: List[EvaluationResult]) -> EvaluationResult:
     """Select best performing technique based on Macro F1 score."""
     if not results:
@@ -604,11 +523,12 @@ def choose_best_technique(results: List[EvaluationResult]) -> EvaluationResult:
     
     return best
 
-
 def run_oversampling(
     df: pd.DataFrame = None,
     split_before: bool = True,
-    evaluate_synthetic: bool = True
+    evaluate_synthetic: bool = True,
+    min_total_samples: int = 50000, 
+    balance_method: str = "equal"    
 ) -> pd.DataFrame:
 
     ensure_directories()
@@ -637,9 +557,6 @@ def run_oversampling(
         if col in encoded_X.columns
     ]
     
-    # Prepare discrete columns for GAN models
-    discrete_columns = [col for col in encoded_X.columns if col in categorical_columns]
-    
     # Split data if requested
     if split_before:
         test_size = MODEL_CONFIG.get("test_size", 0.2)
@@ -654,18 +571,23 @@ def run_oversampling(
     else:
         X_train, y_train = encoded_X, y
     
-    # Evaluate all techniques
+    sampling_strategy = calculate_balanced_sampling_strategy(
+        y_train,
+        min_total_samples=min_total_samples,
+        balance_method=balance_method
+    )
+    
     n_splits = MODEL_CONFIG.get("cv_folds", 5)
     results, samplers = evaluate_all_samplers(
         X_train,
         y_train,
         categorical_indices,
-        discrete_columns,
+        sampling_strategy,
         n_splits,
     )
     
     # Display results
-    summarize_results(results)
+    summarise_results(results)
     
     # Choose best
     best_result = choose_best_technique(results)
@@ -676,6 +598,7 @@ def run_oversampling(
     X_resampled, y_resampled = best_sampler(X_train.copy(), y_train.copy())
     
     logger.info("Resampled: %d rows", len(X_resampled))
+    logger.info("Resampled class distribution:\n%s", y_resampled.value_counts())
     
     # Decode categorical features
     X_decoded = decode_categorical_features(X_resampled, categorical_mappings)
@@ -687,34 +610,18 @@ def run_oversampling(
     logger.info("After validation: %d rows", len(validated_df))
     logger.info("Final class distribution:\n%s", validated_df[TARGET_COLUMN].value_counts())
     
+    # Add back SC_ID column
+    validated_df = add_sc_id_column(validated_df, start_from=1)
+    
     # Save results
-    output_path = OUTPUT_DIR / f"oversampled_{best_result.name.lower()}.csv"
+    output_path = PROCESSED_DATA_DIR / f"oversampled_{best_result.name.lower()}.csv"
     validated_df.to_csv(output_path, index=False)
     logger.info("Saved oversampled dataset to: %s", output_path)
 
-    # If the param specifies to evaluate the synthetic data
-    if evaluate_synthetic:
-        logger.info("\n" + "="*80)
-        logger.info("EVALUATING SYNTHETIC DATA QUALITY")
-        logger.info("="*80)
-        try:
-            from utils.syn_evaluation import SyntheticDataEvaluator
-            
-            # Use only the synthetic samples (optional)
-            original_size = len(original_data)
-            synthetic_only = validated_df.iloc[original_size:] if len(validated_df) > original_size else validated_df
-            
-            # If we want to compare full oversampled vs original
-            evaluator = SyntheticDataEvaluator(original_data, validated_df)
-            eval_results = evaluator.evaluate_all()
-            evaluator.display_results(eval_results)
-            
-        except ImportError:
-            logger.warning("Could not import SyntheticDataEvaluator. Skipping quality evaluation.")
-        except Exception as e:
-            logger.error("Error during synthetic data evaluation: %s", e)
-    
     return validated_df
 
 if __name__ == "__main__":
-    oversampled_data = run_oversampling(split_before=True, evaluate_synthetic=True)
+    oversampled_data = run_oversampling(split_before=True, 
+                                        evaluate_synthetic=True,
+                                        min_total_samples=50000,
+                                        balance_method="proportional")
