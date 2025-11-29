@@ -34,7 +34,7 @@ from model_evaluation_utils import (
 
 import config
 
-DEFAULT_DATA_PATH = config.PROCESSED_DATA_DIR / "syn_20000_engineered_features.csv"
+DEFAULT_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 DEFAULT_OUTPUT_PATH = config.MODELS_DIR / "random_forest_results.yaml"
 DEFAULT_TARGET = "Risk_Classification"
 CLASS_THRESHOLD = 15
@@ -269,16 +269,16 @@ def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a Random Forest on the engineered synthetic dataset.")
-    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to syn_20000_engineered_features.csv")
+    parser = argparse.ArgumentParser(description="Train a Random Forest on the engineered supplier dataset.")
+    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to engineered_supplier_commodity_features.csv")
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
     parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
     parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
     parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--n-estimators", type=int, default=300, help="Number of trees in the forest.")
-    parser.add_argument("--max-depth", type=int, default=None, help="Maximum tree depth.")
-    parser.add_argument("--min-samples-split", type=int, default=2, help="Minimum samples required to split an internal node.")
-    parser.add_argument("--min-samples-leaf", type=int, default=1, help="Minimum samples required to be at a leaf node.")
+    parser.add_argument("--n-estimators", type=int, default=600, help="Number of trees in the forest.")
+    parser.add_argument("--max-depth", type=int, default=14, help="Maximum tree depth.")
+    parser.add_argument("--min-samples-split", type=int, default=4, help="Minimum samples required to split an internal node.")
+    parser.add_argument("--min-samples-leaf", type=int, default=2, help="Minimum samples required to be at a leaf node.")
     parser.add_argument("--max-features", type=str, default="sqrt", help="Number of features to consider when looking for the best split.")
     parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel jobs for training.")
     parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
