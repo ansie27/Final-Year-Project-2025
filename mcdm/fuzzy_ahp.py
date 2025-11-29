@@ -7,19 +7,31 @@ from typing import Dict, List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from prettytable import PrettyTable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
+import config
+from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
 from src.utils import ensure_directory, print_progress, print_section_header
 from utils.fuzzy_operations import TriangularFuzzyNumber, calculate_consistency_ratio
 
+ENGINEERED_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.json"
 VISUALIZATION_PATH = PROJECT_ROOT / "outputs" / "visualizations" / "fuzzy_ahp_results.png"
 WEIGHTS_OUTPUT_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_weights.json"
 RANDOM_STATE = 42
+IDENTIFIER_COLUMNS = {
+    "SC_ID",
+    "Supplier_ID",
+    "Supplier_Name",
+    "Commodity_ID",
+    "Commodity_Name",
+    "Risk_Classification",
+}
 
 RATIO_THRESHOLDS: List[Tuple[float, int]] = [
     (1.15, 1),
@@ -54,22 +66,44 @@ def ratio_to_fuzzy_saathy(ratio: float) -> TriangularFuzzyNumber:
     return TriangularFuzzyNumber.from_saaty_scale(9)
 
 
-def load_critical_features(path: Path) -> List[Dict[str, float]]:
-    if not path.exists():
-        raise FileNotFoundError(f"Critical features file not found at {path}")
-    with path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-    if not data:
-        raise ValueError("Critical features list is empty.")
-    return data
+def load_baseline_importances(
+    dataset_path: Path = ENGINEERED_DATA_PATH,
+) -> Tuple[List[str], np.ndarray]:
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Engineered dataset not found at {dataset_path}")
 
+    df = pd.read_csv(dataset_path)
+    candidate_features = [
+        col for col in getattr(config, "FEATURE_COLUMNS", []) if col in df.columns
+    ]
 
-def normalise_weights(importance_values: Sequence[float]) -> np.ndarray:
-    arr = np.asarray(importance_values, dtype=float)
-    total = arr.sum()
-    if total == 0:
-        raise ValueError("Importance values sum to zero; cannot normalise.")
-    return arr / total
+    if not candidate_features:
+        numeric_cols = [
+            col
+            for col in df.columns
+            if pd.api.types.is_numeric_dtype(df[col]) and col not in IDENTIFIER_COLUMNS
+        ]
+        candidate_features = numeric_cols
+
+    if not candidate_features:
+        raise ValueError("No numeric features available for fuzzy AHP analysis.")
+
+    feature_frame = (
+        df[candidate_features].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+    )
+    variances = feature_frame.var(ddof=0).replace(0, 1e-6)
+    baseline = variances.to_numpy(dtype=float)
+    baseline /= baseline.sum()
+
+    feature_snapshot = [
+        {"feature": name, "importance": float(value)}
+        for name, value in zip(feature_frame.columns, baseline)
+    ]
+    ensure_directory(CRITICAL_FEATURES_PATH.parent)
+    with CRITICAL_FEATURES_PATH.open("w", encoding="utf-8") as handle:
+        json.dump(feature_snapshot, handle, indent=2)
+
+    return feature_frame.columns.tolist(), baseline
 
 
 def build_fuzzy_pairwise_matrix(weights: Sequence[float]) -> List[List[TriangularFuzzyNumber]]:
@@ -121,73 +155,6 @@ def evaluate_consistency(matrix: List[List[TriangularFuzzyNumber]], weights: np.
     return calculate_consistency_ratio(crisp_matrix, weights)
 
 
-def ga_optimise_weights(
-    baseline_weights: np.ndarray,
-    generations: int = 60,
-    population_size: int = 40,
-    mutation_rate: float = 0.2,
-    crossover_rate: float = 0.8,
-    random_state: int = RANDOM_STATE,
-) -> np.ndarray:
-    rng = np.random.default_rng(random_state)
-    n = len(baseline_weights)
-
-    def initialise_population() -> np.ndarray:
-        perturbation = rng.lognormal(mean=0.0, sigma=0.3, size=(population_size, n))
-        population = baseline_weights * perturbation
-        population += 1e-6
-        return population
-
-    def fitness(candidate: np.ndarray) -> float:
-        weights = candidate / candidate.sum()
-        matrix = weights[:, None] / weights[None, :]
-        cr = calculate_consistency_ratio(matrix, weights)
-        penalty = 0.1 * np.linalg.norm(weights - baseline_weights)
-        return cr + penalty
-
-    def tournament_select(population: np.ndarray, scores: np.ndarray, k: int = 3) -> np.ndarray:
-        idx = rng.choice(len(population), size=k, replace=False)
-        best_idx = idx[np.argmin(scores[idx])]
-        return population[best_idx]
-
-    def crossover(parent1: np.ndarray, parent2: np.ndarray) -> np.ndarray:
-        alpha = rng.random()
-        return alpha * parent1 + (1 - alpha) * parent2
-
-    def mutate(candidate: np.ndarray) -> np.ndarray:
-        noise = rng.lognormal(mean=0.0, sigma=0.2, size=candidate.shape)
-        mutated = candidate * (1 + mutation_rate * (noise - 1))
-        mutated[mutated <= 0] = 1e-6
-        return mutated
-
-    population = initialise_population()
-    best_candidate = population[0]
-    best_score = fitness(best_candidate)
-
-    for _ in range(generations):
-        scores = np.array([fitness(ind) for ind in population])
-        gen_best_idx = np.argmin(scores)
-        if scores[gen_best_idx] < best_score:
-            best_score = scores[gen_best_idx]
-            best_candidate = population[gen_best_idx]
-
-        new_population = []
-        while len(new_population) < population_size:
-            parent1 = tournament_select(population, scores)
-            parent2 = tournament_select(population, scores)
-
-            child = parent1.copy()
-            if rng.random() < crossover_rate:
-                child = crossover(parent1, parent2)
-            if rng.random() < mutation_rate:
-                child = mutate(child)
-            new_population.append(child)
-        population = np.array(new_population)
-
-    optimised = best_candidate / best_candidate.sum()
-    return optimised
-
-
 def build_results_table(results: List[FuzzyAHPResult], standard_cr: float, ga_cr: float) -> PrettyTable:
     table = PrettyTable()
     table.field_names = ["Feature", "Baseline Importance", "Fuzzy AHP Weight", "GA Fuzzy AHP Weight"]
@@ -233,14 +200,12 @@ def save_results_table_plot(results: List[FuzzyAHPResult], standard_cr: float, g
     print_progress(f"Saved Fuzzy AHP table to {output_path}")
 
 
-def save_weights_json(
+def build_weights_payload(
     results: List[FuzzyAHPResult],
     standard_cr: float,
     ga_cr: float,
-    output_path: Path,
-) -> None:
-    ensure_directory(output_path.parent)
-    payload = {
+) -> Dict[str, Dict[str, Sequence[Dict[str, float]] | float]]:
+    return {
         "standard": {
             "weights": [
                 {"feature": res.feature, "weight": res.standard_weight} for res in results
@@ -252,17 +217,41 @@ def save_weights_json(
             "consistency_ratio": ga_cr,
         },
     }
+
+
+def save_weights_json(payload: Dict[str, Any], output_path: Path) -> None:
+    ensure_directory(output_path.parent)
     with output_path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
     print_progress(f"Saved fuzzy AHP weights to {output_path}")
 
 
-def run_fuzzy_ahp_analysis() -> None:
+def summarise_weight_differences(
+    standard: np.ndarray,
+    ga: np.ndarray,
+    feature_names: Sequence[str],
+) -> Dict[str, Any]:
+    deltas = np.abs(standard - ga)
+    summary = {
+        "max_delta": float(deltas.max(initial=0.0)),
+        "mean_delta": float(deltas.mean() if len(deltas) else 0.0),
+        "changed_features": [
+            {"feature": name, "delta": float(delta)}
+            for name, delta in sorted(
+                zip(feature_names, deltas), key=lambda item: item[1], reverse=True
+            )
+            if delta > 1e-4
+        ],
+    }
+    return summary
+
+
+def run_fuzzy_ahp_analysis(
+    dataset_path: Path = ENGINEERED_DATA_PATH,
+) -> Dict[str, Any]:
     print_section_header("Fuzzy AHP & GA-optimised Analysis")
-    print_progress("Loading critical features")
-    features = load_critical_features(CRITICAL_FEATURES_PATH)
-    feature_names = [item["feature"] for item in features]
-    baseline_importances = normalise_weights([item["importance"] for item in features])
+    print_progress("Deriving baseline importances from engineered dataset")
+    feature_names, baseline_importances = load_baseline_importances(dataset_path)
 
     print_progress("Computing standard fuzzy AHP weights")
     fuzzy_matrix = build_fuzzy_pairwise_matrix(baseline_importances)
@@ -270,21 +259,54 @@ def run_fuzzy_ahp_analysis() -> None:
     standard_cr = evaluate_consistency(fuzzy_matrix, standard_weights)
 
     print_progress("Optimising weights via Genetic Algorithm")
-    ga_weights = ga_optimise_weights(baseline_importances)
+    ga_seed_weights = baseline_importances.copy()
+
+    def _fitness(candidate: np.ndarray) -> float:
+        weights = candidate / candidate.sum()
+        matrix = weights[:, None] / weights[None, :]
+        cr = calculate_consistency_ratio(matrix, weights)
+        penalty = 0.1 * np.linalg.norm(weights - standard_weights)
+        return cr + penalty
+
+    optimizer = WeightGAOptimizer(GAParameters(random_state=RANDOM_STATE))
+    ga_weights = optimizer.optimise(ga_seed_weights, _fitness)
     ga_matrix = build_fuzzy_pairwise_matrix(ga_weights)
     _, ga_fuzzy_weights = compute_fuzzy_weights(ga_matrix)
     ga_cr = evaluate_consistency(ga_matrix, ga_fuzzy_weights)
 
     results = [
         FuzzyAHPResult(name, base, std, ga)
-        for name, base, std, ga in zip(feature_names, baseline_importances, standard_weights, ga_fuzzy_weights)
+        for name, base, std, ga in zip(
+            feature_names, baseline_importances, standard_weights, ga_fuzzy_weights
+        )
     ]
 
     table = build_results_table(results, standard_cr, ga_cr)
     print(table)
 
+    weights_payload = build_weights_payload(results, standard_cr, ga_cr)
     save_results_table_plot(results, standard_cr, ga_cr, VISUALIZATION_PATH)
-    save_weights_json(results, standard_cr, ga_cr, WEIGHTS_OUTPUT_PATH)
+    save_weights_json(weights_payload, WEIGHTS_OUTPUT_PATH)
+
+    diff_summary = summarise_weight_differences(standard_weights, ga_fuzzy_weights, feature_names)
+    if diff_summary["changed_features"]:
+        top_feature = diff_summary["changed_features"][0]
+        print_progress(
+            f"Greatest GA shift observed on '{top_feature['feature']}' "
+            f"with Δ={top_feature['delta']:.4f}"
+        )
+    else:
+        print_progress("GA optimisation produced negligible changes to weights")
+
+    return {
+        "feature_names": feature_names,
+        "baseline_importances": baseline_importances,
+        "standard_weights": standard_weights,
+        "ga_weights": ga_fuzzy_weights,
+        "consistency": {"standard": standard_cr, "ga": ga_cr},
+        "weights_payload": weights_payload,
+        "difference_summary": diff_summary,
+    }
 
 
 def main() -> None:
