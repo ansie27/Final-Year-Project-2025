@@ -1,4 +1,3 @@
-import argparse
 import os
 import random
 import sys
@@ -48,6 +47,24 @@ IDENTIFIER_COLUMNS = [
     "Commodity_Name",
 ]
 MODEL_LABEL = "ANN"
+
+
+@dataclass
+class ANNTrainingConfig:
+    data_path: Path = DEFAULT_DATA_PATH
+    output_path: Path = DEFAULT_OUTPUT_PATH
+    target_column: str = DEFAULT_TARGET
+    backend: str = "tensorflow"
+    test_size: float = 0.2
+    val_size: float = 0.1
+    hidden_layers: Tuple[int, ...] = (512, 256, 128)
+    dropout: float = 0.25
+    learning_rate: float = 3e-4
+    epochs: int = 200
+    batch_size: int = 256
+    patience: int = 20
+    positive_class: str = "High"
+    top_k: int = 500
 
 
 def set_random_seeds(seed: Optional[int] = None) -> None:
@@ -111,7 +128,6 @@ class DatasetBundle:
     task_type: str
     n_classes: Optional[int] = None
     class_names: Optional[List[str]] = None
-
 
 def create_data_bundle(
     features: pd.DataFrame,
@@ -182,7 +198,6 @@ def create_data_bundle(
         class_names=class_names,
     )
 
-
 def build_keras_model(
     input_dim: int,
     task_type: str,
@@ -218,8 +233,9 @@ def build_keras_model(
     )
     return model
 
+class TorchMLP(nn.Module):
+    FILE_EXTENSION = ".pth"
 
-class TorchMLP(nn.Module):  # pragma: no cover - torch optional
     def __init__(self, input_dim: int, hidden_layers: Iterable[int], dropout: float, output_dim: int) -> None:
         super().__init__()
         layers: List[nn.Module] = []
@@ -232,9 +248,14 @@ class TorchMLP(nn.Module):  # pragma: no cover - torch optional
         layers.append(nn.Linear(prev_units, output_dim))
         self.network = nn.Sequential(*layers)
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:  # type: ignore[override]
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.network(inputs)
 
+    def save(self, output_dir: Path, artifact_name: str) -> Path:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        target_path = (output_dir / artifact_name).with_suffix(self.FILE_EXTENSION)
+        torch.save(self.state_dict(), target_path)
+        return target_path
 
 def tensorflow_training(
     data: DatasetBundle,
@@ -244,7 +265,7 @@ def tensorflow_training(
     epochs: int,
     batch_size: int,
     patience: int,
-) -> Tuple[np.ndarray, Dict[str, List[float]]]:
+) -> Tuple[np.ndarray, Dict[str, List[float]], keras.Model]:
     if tf is None or keras is None:
         raise ImportError("TensorFlow/Keras is not available. Install tensorflow to use this backend.")
 
@@ -281,8 +302,7 @@ def tensorflow_training(
 
     history_dict = {key: [float(v) for v in values] for key, values in history.history.items()}
 
-    return predictions.squeeze(), history_dict
-
+    return predictions.squeeze(), history_dict, model
 
 def torch_training(
     data: DatasetBundle,
@@ -292,7 +312,7 @@ def torch_training(
     epochs: int,
     batch_size: int,
     patience: int,
-) -> Tuple[np.ndarray, Dict[str, List[float]]]:
+) -> Tuple[np.ndarray, Dict[str, List[float]], nn.Module]:
     if torch is None or nn is None or DataLoader is None:
         raise ImportError("PyTorch is not available. Install torch to use this backend.")
 
@@ -408,8 +428,7 @@ def torch_training(
         else:
             predictions = torch.softmax(outputs, dim=1).cpu().numpy()
 
-    return predictions, history
-
+    return predictions, history, model
 
 def compute_metrics(
     task_type: str,
@@ -449,25 +468,26 @@ def save_results_yaml(
         yaml.safe_dump(payload, handle, sort_keys=False)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Train an ANN on the engineered supplier dataset.")
-    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to engineered_supplier_commodity_features.csv")
-    parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
-    parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
-    parser.add_argument("--backend", type=str, choices=["tensorflow", "pytorch"], default="tensorflow", help="Deep learning backend.")
-    parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
-    parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--hidden-layers", type=int, nargs="+", default=[512, 256, 128], help="Hidden layer sizes.")
-    parser.add_argument("--dropout", type=float, default=0.25, help="Dropout rate.")
-    parser.add_argument("--learning-rate", type=float, default=3e-4, help="Learning rate.")
-    parser.add_argument("--epochs", type=int, default=200, help="Maximum training epochs.")
-    parser.add_argument("--batch-size", type=int, default=256, help="Mini-batch size.")
-    parser.add_argument("--patience", type=int, default=20, help="Early stopping patience.")
-    parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
-    parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
-    args = parser.parse_args()
+def persist_ann_model(
+    model: Any,
+    backend: str,
+    label: str,
+) -> Path:
+    artifact_name = label.lower().replace(" ", "_")
+    if backend == "tensorflow":
+        target_path = PROJECT_ROOT / f"{artifact_name}.keras"
+        PROJECT_ROOT.mkdir(parents=True, exist_ok=True)
+        model.save(target_path, include_optimizer=False)
+        return target_path
+    if hasattr(model, "save"):
+        return model.save(PROJECT_ROOT, artifact_name)
+    raise RuntimeError("Unsupported ANN backend for persistence.")
 
-    backend = args.backend
+
+def run_ann_training(cfg: Optional[ANNTrainingConfig] = None) -> Dict[str, Any]:
+    cfg = cfg or ANNTrainingConfig()
+
+    backend = cfg.backend
     if backend == "tensorflow" and tf is None:
         backend = "pytorch"
     if backend == "pytorch" and torch is None:
@@ -479,44 +499,48 @@ def main() -> None:
 
     set_random_seeds(config.RANDOM_SEED)
 
-    dataset = load_dataset(args.data_path)
-    if args.target_column not in dataset.columns:
+    data_path = Path(cfg.data_path)
+    output_path = Path(cfg.output_path)
+    target_column = cfg.target_column
+
+    dataset = load_dataset(data_path)
+    if target_column not in dataset.columns:
         fallback_column = "Risk_Classification" if "Risk_Classification" in dataset.columns else None
         if fallback_column is None:
-            raise ValueError(f"Target column '{args.target_column}' not found and no fallback target is available.")
-        print(f"[!] Target '{args.target_column}' not found. Falling back to '{fallback_column}'.")
-        args.target_column = fallback_column
+            raise ValueError(f"Target column '{target_column}' not found and no fallback target is available.")
+        print(f"[!] Target '{target_column}' not found. Falling back to '{fallback_column}'.")
+        target_column = fallback_column
 
-    features, target = prepare_features(dataset, args.target_column)
+    features, target = prepare_features(dataset, target_column)
     bundle = create_data_bundle(
         features=features,
         target=target,
-        test_size=args.test_size,
-        val_size=args.val_size,
+        test_size=cfg.test_size,
+        val_size=cfg.val_size,
         random_state=config.RANDOM_SEED,
     )
 
-    hidden_layers = tuple(args.hidden_layers)
+    hidden_layers = tuple(cfg.hidden_layers)
 
     if backend == "tensorflow":
-        raw_predictions, history = tensorflow_training(
+        raw_predictions, history, trained_model = tensorflow_training(
             data=bundle,
             hidden_layers=hidden_layers,
-            dropout=args.dropout,
-            learning_rate=args.learning_rate,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            patience=args.patience,
+            dropout=cfg.dropout,
+            learning_rate=cfg.learning_rate,
+            epochs=cfg.epochs,
+            batch_size=cfg.batch_size,
+            patience=cfg.patience,
         )
     else:
-        raw_predictions, history = torch_training(
+        raw_predictions, history, trained_model = torch_training(
             data=bundle,
             hidden_layers=hidden_layers,
-            dropout=args.dropout,
-            learning_rate=args.learning_rate,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            patience=args.patience,
+            dropout=cfg.dropout,
+            learning_rate=cfg.learning_rate,
+            epochs=cfg.epochs,
+            batch_size=cfg.batch_size,
+            patience=cfg.patience,
         )
 
     metrics = compute_metrics(
@@ -533,28 +557,28 @@ def main() -> None:
             bundle.y_test,
             probabilities,
             bundle.class_names,
-            args.positive_class,
-            args.top_k,
+            cfg.positive_class,
+            cfg.top_k,
         )
         metrics.update(extra_metrics)
 
     payload: Dict[str, Any] = {
         "dataset": {
-            "path": str(Path(args.data_path).resolve()),
+            "path": str(data_path.resolve()),
             "num_rows": int(len(dataset)),
             "num_features": len(bundle.feature_names),
-            "target_column": args.target_column,
+            "target_column": target_column,
             "task_type": bundle.task_type,
             "class_names": bundle.class_names,
         },
         "training": {
             "backend": backend,
             "hidden_layers": list(hidden_layers),
-            "dropout": args.dropout,
-            "learning_rate": args.learning_rate,
-            "epochs": args.epochs,
-            "batch_size": args.batch_size,
-            "patience": args.patience,
+            "dropout": cfg.dropout,
+            "learning_rate": cfg.learning_rate,
+            "epochs": cfg.epochs,
+            "batch_size": cfg.batch_size,
+            "patience": cfg.patience,
             "random_seed": config.RANDOM_SEED,
         },
         "metrics": metrics,
@@ -564,8 +588,16 @@ def main() -> None:
     if evaluation_details:
         payload["evaluation"] = evaluation_details
 
-    save_results_yaml(args.output_path, payload)
-    print(f"[+] ANN training complete. Results saved to {args.output_path}")
+    artifact_path = persist_ann_model(trained_model, backend, MODEL_LABEL)
+    payload["model_artifact"] = str(artifact_path)
+
+    save_results_yaml(output_path, payload)
+    print(f"[+] ANN training complete. Results saved to {output_path}")
+    return payload
+
+
+def main() -> None:
+    run_ann_training()
 
 
 if __name__ == "__main__":

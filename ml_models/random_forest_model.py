@@ -1,4 +1,3 @@
-import argparse
 import os
 import random
 import sys
@@ -45,6 +44,23 @@ IDENTIFIER_COLUMNS = [
     "Commodity_Name",
 ]
 MODEL_LABEL = "Random Forest"
+
+
+@dataclass
+class RandomForestTrainingConfig:
+    data_path: Path = DEFAULT_DATA_PATH
+    output_path: Path = DEFAULT_OUTPUT_PATH
+    target_column: str = DEFAULT_TARGET
+    test_size: float = 0.2
+    val_size: float = 0.1
+    n_estimators: int = 600
+    max_depth: Optional[int] = 14
+    min_samples_split: int = 4
+    min_samples_leaf: int = 2
+    max_features: str = "sqrt"
+    n_jobs: int = -1
+    positive_class: str = "High"
+    top_k: int = 500
 
 
 def set_random_seed(seed: Optional[int] = None) -> None:
@@ -268,50 +284,50 @@ def save_results_yaml(output_path: Path, payload: Dict[str, Any]) -> None:
         yaml.safe_dump(payload, handle, sort_keys=False)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a Random Forest on the engineered supplier dataset.")
-    parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH, help="Path to engineered_supplier_commodity_features.csv")
-    parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH, help="Destination YAML file for results.")
-    parser.add_argument("--target-column", type=str, default=DEFAULT_TARGET, help="Target column to predict.")
-    parser.add_argument("--test-size", type=float, default=0.2, help="Fraction for hold-out test set.")
-    parser.add_argument("--val-size", type=float, default=0.1, help="Fraction for validation set (taken from train split).")
-    parser.add_argument("--n-estimators", type=int, default=600, help="Number of trees in the forest.")
-    parser.add_argument("--max-depth", type=int, default=14, help="Maximum tree depth.")
-    parser.add_argument("--min-samples-split", type=int, default=4, help="Minimum samples required to split an internal node.")
-    parser.add_argument("--min-samples-leaf", type=int, default=2, help="Minimum samples required to be at a leaf node.")
-    parser.add_argument("--max-features", type=str, default="sqrt", help="Number of features to consider when looking for the best split.")
-    parser.add_argument("--n-jobs", type=int, default=-1, help="Number of parallel jobs for training.")
-    parser.add_argument("--positive-class", type=str, default="High", help="Label treated as positive for Precision@K/Recall@K.")
-    parser.add_argument("--top-k", type=int, default=500, help="Number of top predictions for Precision@K/Recall@K.")
-    args = parser.parse_args()
+def save_model_artifact(model: Any, label: str) -> Path:
+    artifact_name = label.lower().replace(" ", "_")
+    file_path = PROJECT_ROOT / f"{artifact_name}.joblib"
+    import joblib
 
+    joblib.dump(model, file_path)
+    return file_path
+
+
+def run_random_forest_training(
+    cfg: Optional[RandomForestTrainingConfig] = None,
+) -> Dict[str, Any]:
+    cfg = cfg or RandomForestTrainingConfig()
     set_random_seed(config.RANDOM_SEED)
 
-    dataset = load_dataset(args.data_path)
-    if args.target_column not in dataset.columns:
+    data_path = Path(cfg.data_path)
+    output_path = Path(cfg.output_path)
+    target_column = cfg.target_column
+
+    dataset = load_dataset(data_path)
+    if target_column not in dataset.columns:
         fallback_column = "Risk_Classification" if "Risk_Classification" in dataset.columns else None
         if fallback_column is None:
-            raise ValueError(f"Target column '{args.target_column}' not found and no fallback target is available.")
-        print(f"[!] Target '{args.target_column}' not found. Falling back to '{fallback_column}'.")
-        args.target_column = fallback_column
+            raise ValueError(f"Target column '{target_column}' not found and no fallback target is available.")
+        print(f"[!] Target '{target_column}' not found. Falling back to '{fallback_column}'.")
+        target_column = fallback_column
 
-    features, target = prepare_features(dataset, args.target_column)
+    features, target = prepare_features(dataset, target_column)
     bundle = create_data_bundle(
         features=features,
         target=target,
-        test_size=args.test_size,
-        val_size=args.val_size,
+        test_size=cfg.test_size,
+        val_size=cfg.val_size,
         random_state=config.RANDOM_SEED,
     )
 
     model, val_metrics, test_metrics = train_random_forest(
         bundle=bundle,
-        n_estimators=args.n_estimators,
-        max_depth=args.max_depth,
-        min_samples_split=args.min_samples_split,
-        min_samples_leaf=args.min_samples_leaf,
-        max_features=args.max_features,
-        n_jobs=args.n_jobs,
+        n_estimators=cfg.n_estimators,
+        max_depth=cfg.max_depth,
+        min_samples_split=cfg.min_samples_split,
+        min_samples_leaf=cfg.min_samples_leaf,
+        max_features=cfg.max_features,
+        n_jobs=cfg.n_jobs,
     )
     evaluation_details = None
     if bundle.task_type == "classification":
@@ -321,31 +337,31 @@ def main() -> None:
             bundle.y_test,
             prob_matrix,
             bundle.class_names,
-            args.positive_class,
-            args.top_k,
+            cfg.positive_class,
+            cfg.top_k,
         )
         test_metrics.update(extra_metrics)
 
     payload: Dict[str, Any] = {
         "dataset": {
-            "path": str(Path(args.data_path).resolve()),
+            "path": str(data_path.resolve()),
             "num_rows": int(len(dataset)),
             "num_features": len(bundle.feature_names),
-            "target_column": args.target_column,
+            "target_column": target_column,
             "task_type": bundle.task_type,
             "class_names": bundle.class_names,
         },
         "training": {
             "model": "RandomForestRegressor" if bundle.task_type == "regression" else "RandomForestClassifier",
-            "n_estimators": args.n_estimators,
-            "max_depth": args.max_depth,
-            "min_samples_split": args.min_samples_split,
-            "min_samples_leaf": args.min_samples_leaf,
-            "max_features": args.max_features,
-            "n_jobs": args.n_jobs,
+            "n_estimators": cfg.n_estimators,
+            "max_depth": cfg.max_depth,
+            "min_samples_split": cfg.min_samples_split,
+            "min_samples_leaf": cfg.min_samples_leaf,
+            "max_features": cfg.max_features,
+            "n_jobs": cfg.n_jobs,
             "random_seed": config.RANDOM_SEED,
-            "test_size": args.test_size,
-            "val_size": args.val_size,
+            "test_size": cfg.test_size,
+            "val_size": cfg.val_size,
         },
         "metrics": {
             "validation": val_metrics,
@@ -357,8 +373,16 @@ def main() -> None:
     if evaluation_details:
         payload["evaluation"] = evaluation_details
 
-    save_results_yaml(args.output_path, payload)
-    print(f"[+] Random Forest training complete. Results saved to {args.output_path}")
+    artifact_path = save_model_artifact(model, MODEL_LABEL)
+    payload["model_artifact"] = str(artifact_path)
+
+    save_results_yaml(output_path, payload)
+    print(f"[+] Random Forest training complete. Results saved to {output_path}")
+    return payload
+
+
+def main() -> None:
+    run_random_forest_training()
 
 
 if __name__ == "__main__":
