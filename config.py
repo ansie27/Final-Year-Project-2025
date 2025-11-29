@@ -13,6 +13,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 RAW_DATA_PATH = RAW_DATA_DIR / "syn_supplier_commodity_dataset.csv"
 PROCESSED_DATA_PATH = PROCESSED_DATA_DIR / "preprocessed_supplier_commodity_dataset.csv"
 OVERSAMPLED_DATA_PATH = PROCESSED_DATA_DIR / "oversampled_preprocessed_supplier_commodity_data.csv"
+ENGINEERED_DATA_PATH = PROCESSED_DATA_DIR / "engineered_supplier_commodity_features.csv"
 
 # Output directories
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
