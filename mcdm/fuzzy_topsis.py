@@ -2,8 +2,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
-
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 from prettytable import PrettyTable
@@ -14,7 +13,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import config
 from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
-from src.utils import ensure_directory, print_progress, print_section_header
 from utils.fuzzy_operations import TriangularFuzzyNumber, vertex_distance
 
 DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
@@ -29,6 +27,19 @@ IDENTIFIER_COLUMNS = [
     "Commodity_ID",
     "Commodity_Name",
 ]
+
+
+def ensure_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def print_progress(message: str, **_: object) -> None:
+    print(f"[Fuzzy TOPSIS] {message}")
+
+
+def print_section_header(title: str) -> None:
+    banner = "=" * len(title)
+    print(f"\n{banner}\n{title}\n{banner}")
 
 
 @dataclass
