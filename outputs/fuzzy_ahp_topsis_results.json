@@ -1,0 +1,13 @@
+{
+  "mcdm_pipeline": {
+    "weight_delta_max": 0.0,
+    "weight_delta_mean": 0.0,
+    "ranking_correlation": 0.9999999999999998,
+    "score_shift_mean": 0.0,
+    "top_changes": [],
+    "consistency": {
+      "standard": 1.3444517232925264e-16,
+      "ga": 1.3444517232925264e-16
+    }
+  }
+}
