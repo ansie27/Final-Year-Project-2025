@@ -14,7 +14,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-# Ensure the project root is available on the Python path when executing this file directly.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
@@ -37,8 +36,7 @@ SELECTED_FEATURE_DATASET_PATH = (
 MODEL_COMPARISON_PATH = PROJECT_ROOT / "outputs" / "model_comparison" / "feature_subset_comparison.json"
 TARGET_COLUMN = "Risk_Classification"
 IDENTIFIER_COLUMNS = [
-    "Supplier_ID",
-    "Commodity_ID",
+    "SC_ID",
     "Supplier_Name",
     "Commodity_Name",
 ]
@@ -65,15 +63,12 @@ TOP_FEATURE_RESULT_PATHS: Dict[str, Path] = {
     "ann": config.MODELS_DIR / "ann_top_features.yaml",
 }
 
-
 def ensure_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
-
 
 def print_section_header(title: str) -> None:
     border = "=" * len(title)
     print(f"\n{border}\n{title}\n{border}")
-
 
 def print_progress(message: str, step: Optional[int] = None, total: Optional[int] = None) -> None:
     prefix = "[progress]"
@@ -81,16 +76,13 @@ def print_progress(message: str, step: Optional[int] = None, total: Optional[int
         prefix += f" ({step}/{total})"
     print(f"{prefix} {message}")
 
-
 def load_dataset(path: Path) -> pd.DataFrame:
     """Load the engineered dataset and validate its presence."""
     if not path.exists():
         raise FileNotFoundError(f"Dataset not found at {path}")
     return pd.read_csv(path)
 
-
 def split_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
-    """Separate predictors and target column while dropping identifier fields."""
     if TARGET_COLUMN not in df.columns:
         raise ValueError(f"Target column '{TARGET_COLUMN}' is missing from the dataset.")
     X = df.drop(columns=[TARGET_COLUMN])
@@ -99,7 +91,6 @@ def split_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series
         X = X.drop(columns=removed_cols)
     y = df[TARGET_COLUMN]
     return X, y, removed_cols
-
 
 def identify_feature_types(X: pd.DataFrame) -> Tuple[List[str], List[str]]:
     """Identify categorical and numerical features."""
@@ -110,7 +101,6 @@ def identify_feature_types(X: pd.DataFrame) -> Tuple[List[str], List[str]]:
         raise ValueError("No features found for modeling.")
 
     return categorical_cols, numeric_cols
-
 
 def build_model_pipeline(
     categorical_cols: List[str], numeric_cols: List[str], model_random_state: int | None = None
@@ -185,7 +175,6 @@ def compute_permutation_importance(
     categorical_cols: List[str],
     numeric_cols: List[str],
 ) -> pd.DataFrame:
-    """Fit the pipeline and calculate permutation feature importance."""
 
     pipeline.fit(X_train, y_train)
     result = permutation_importance(
@@ -222,11 +211,6 @@ def compute_stable_permutation_importance(
     max_iterations: int = MAX_PFI_ITERATIONS,
     tolerance: float = PFI_STABILITY_TOLERANCE,
 ) -> pd.DataFrame:
-    """
-    Re-run permutation importance until results stabilize or the iteration cap is reached.
-
-    The final importance values are the mean importances across all completed iterations.
-    """
 
     history: List[pd.DataFrame] = []
     previous_run: pd.DataFrame | None = None
@@ -273,7 +257,6 @@ def compute_stable_permutation_importance(
 
 
 def plot_top_features(top_features: pd.DataFrame, output_path: Path) -> None:
-    """Create and save a horizontal bar chart of feature importances."""
     ensure_directory(output_path.parent)
 
     plt.figure(figsize=(10, 6))
@@ -439,7 +422,6 @@ def persist_comparison_summary(summary: Dict[str, Any], path: Path) -> None:
     path.write_text(json.dumps(summary, indent=2))
     print_progress(f"Performance comparison saved to {path}")
 
-
 def run_feature_selection() -> None:
     """Execute the full permutation feature importance workflow."""
     print_section_header("Permutation Feature Importance Analysis")
@@ -499,11 +481,8 @@ def run_feature_selection() -> None:
         )
     print_progress(comparison_summary["conclusion"])
 
-
 def main() -> None:
     run_feature_selection()
 
-
 if __name__ == "__main__":
     main()
-

@@ -3,7 +3,7 @@ import sys
 from dataclasses import dataclass
 from functools import reduce
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -11,50 +11,65 @@ from prettytable import PrettyTable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
 from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
 from utils.fuzzy_operations import TriangularFuzzyNumber, calculate_consistency_ratio
 
-ENGINEERED_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
+DEFAULT_DATASET_PATH = Path(config.ENGINEERED_DATA_PATH)
 CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.json"
 VISUALIZATION_PATH = PROJECT_ROOT / "outputs" / "visualizations" / "fuzzy_ahp_results.png"
 WEIGHTS_OUTPUT_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_weights.json"
 RANDOM_STATE = 42
 IDENTIFIER_COLUMNS = {
     "SC_ID",
-    "Supplier_ID",
     "Supplier_Name",
-    "Commodity_ID",
     "Commodity_Name",
     "Risk_Classification",
 }
 
-
 def ensure_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
-
 def print_progress(message: str) -> None:
     print(f"[Fuzzy AHP] {message}")
-
 
 def print_section_header(title: str) -> None:
     banner = "=" * len(title)
     print(f"\n{banner}\n{title}\n{banner}")
 
 RATIO_THRESHOLDS: List[Tuple[float, int]] = [
-    (1.15, 1),
-    (1.35, 2),
-    (1.55, 3),
-    (1.75, 4),
-    (2.0, 5),
-    (2.5, 6),
-    (3.5, 7),
-    (4.5, 8),
+    (1.0, 1),           # Equal importance
+    (1.5, 2),           # Weak importance
+    (2.5, 3),           # Moderate importance
+    (3.5, 4),           # Moderate to strong importance
+    (4.5, 5),           # Strong importance
+    (6.0, 6),           # Strong to very strong importance
+    (7.5, 7),           # Very strong importance
+    (8.5, 8),           # Very very strong importance
+    (float('inf'), 9),  # Extreme importance
 ]
 
+def ratio_to_fuzzy_saathy(ratio: float) -> TriangularFuzzyNumber:
+    """Convert numerical ratio to fuzzy Saaty scale (1-9)"""
+    if ratio <= 0:
+        raise ValueError("Pairwise ratios must be positive.")
+    
+    # Handle equal importance
+    if np.isclose(ratio, 1.0, atol=0.1):
+        return TriangularFuzzyNumber.from_saaty_scale(1)
+    
+    # Handle reciprocal (inverse comparisons)
+    if ratio < 1:
+        return ratio_to_fuzzy_saathy(1 / ratio).reciprocal()
+    
+    # Map ratio to Saaty scale
+    for threshold, scale in RATIO_THRESHOLDS:
+        if ratio <= threshold:
+            return TriangularFuzzyNumber.from_saaty_scale(scale)
+    
+    return TriangularFuzzyNumber.from_saaty_scale(9)
 
 @dataclass
 class FuzzyAHPResult:
@@ -76,14 +91,15 @@ def ratio_to_fuzzy_saathy(ratio: float) -> TriangularFuzzyNumber:
             return TriangularFuzzyNumber.from_saaty_scale(scale)
     return TriangularFuzzyNumber.from_saaty_scale(9)
 
-
 def load_baseline_importances(
-    dataset_path: Path = ENGINEERED_DATA_PATH,
+    dataset_path: Optional[Path | str] = None,
 ) -> Tuple[List[str], np.ndarray]:
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Engineered dataset not found at {dataset_path}")
+    resolved_path = Path(dataset_path) if dataset_path is not None else DEFAULT_DATASET_PATH
 
-    df = pd.read_csv(dataset_path)
+    if not resolved_path.exists():
+        raise FileNotFoundError(f"Dataset not found at {resolved_path}")
+
+    df = pd.read_csv(resolved_path)
     candidate_features = [
         col for col in getattr(config, "FEATURE_COLUMNS", []) if col in df.columns
     ]
@@ -99,23 +115,23 @@ def load_baseline_importances(
     if not candidate_features:
         raise ValueError("No numeric features available for fuzzy AHP analysis.")
 
-    feature_frame = (
-        df[candidate_features].apply(pd.to_numeric, errors="coerce").fillna(0.0)
-    )
-    variances = feature_frame.var(ddof=0).replace(0, 1e-6)
-    baseline = variances.to_numpy(dtype=float)
-    baseline /= baseline.sum()
+    # Use equal weights as neutral baseline
+    n_features = len(candidate_features)
+    baseline = np.ones(n_features) / n_features
+    
+    # If there is expert judgement and/or domain knowledge
+    # baseline = np.array([get_expert_weight(f) for f in candidate_features])
+    # baseline /= baseline.sum()
 
     feature_snapshot = [
         {"feature": name, "importance": float(value)}
-        for name, value in zip(feature_frame.columns, baseline)
+        for name, value in zip(candidate_features, baseline)
     ]
     ensure_directory(CRITICAL_FEATURES_PATH.parent)
     with CRITICAL_FEATURES_PATH.open("w", encoding="utf-8") as handle:
         json.dump(feature_snapshot, handle, indent=2)
 
-    return feature_frame.columns.tolist(), baseline
-
+    return candidate_features, baseline
 
 def build_fuzzy_pairwise_matrix(weights: Sequence[float]) -> List[List[TriangularFuzzyNumber]]:
     weights = np.asarray(weights, dtype=float)
@@ -130,7 +146,6 @@ def build_fuzzy_pairwise_matrix(weights: Sequence[float]) -> List[List[Triangula
             matrix[i][j] = fuzzy_value
             matrix[j][i] = fuzzy_value.reciprocal()
     return matrix
-
 
 def fuzzy_geometric_means(matrix: List[List[TriangularFuzzyNumber]]) -> List[TriangularFuzzyNumber]:
     n = len(matrix)
@@ -147,24 +162,22 @@ def fuzzy_geometric_means(matrix: List[List[TriangularFuzzyNumber]]) -> List[Tri
         geometric_means.append(gm)
     return geometric_means
 
-
+# Compute FAHP weights with Chang's extent analysis (2020)
 def compute_fuzzy_weights(matrix: List[List[TriangularFuzzyNumber]]) -> Tuple[List[TriangularFuzzyNumber], np.ndarray]:
     gms = fuzzy_geometric_means(matrix)
     total = reduce(lambda acc, val: acc + val, gms[1:], gms[0])
     fuzzy_weights = [gm / total for gm in gms]
     crisp = np.array([fw.defuzzify() for fw in fuzzy_weights], dtype=float)
     crisp /= crisp.sum()
+    
     return fuzzy_weights, crisp
-
 
 def crisp_pairwise_from_fuzzy(matrix: List[List[TriangularFuzzyNumber]]) -> np.ndarray:
     return np.array([[entry.defuzzify() for entry in row] for row in matrix], dtype=float)
 
-
 def evaluate_consistency(matrix: List[List[TriangularFuzzyNumber]], weights: np.ndarray) -> float:
     crisp_matrix = crisp_pairwise_from_fuzzy(matrix)
     return calculate_consistency_ratio(crisp_matrix, weights)
-
 
 def build_results_table(results: List[FuzzyAHPResult], standard_cr: float, ga_cr: float) -> PrettyTable:
     table = PrettyTable()
@@ -180,7 +193,6 @@ def build_results_table(results: List[FuzzyAHPResult], standard_cr: float, ga_cr
         )
     table.add_row(["Consistency Ratio", "", f"{standard_cr:.4f}", f"{ga_cr:.4f}"])
     return table
-
 
 def save_results_table_plot(results: List[FuzzyAHPResult], standard_cr: float, ga_cr: float, output_path: Path) -> None:
     ensure_directory(output_path.parent)
@@ -256,13 +268,14 @@ def summarise_weight_differences(
     }
     return summary
 
-
+# Execute FAHP
 def run_fuzzy_ahp_analysis(
-    dataset_path: Path = ENGINEERED_DATA_PATH,
+    dataset_path: Optional[Path | str] = None,
 ) -> Dict[str, Any]:
-    print_section_header("Fuzzy AHP & GA-optimised Analysis")
-    print_progress("Deriving baseline importances from engineered dataset")
-    feature_names, baseline_importances = load_baseline_importances(dataset_path)
+    resolved_path = Path(dataset_path) if dataset_path is not None else DEFAULT_DATASET_PATH
+    print_section_header("Fuzzy AHP and GA-optimised Analysis")
+    print_progress(f"Deriving baseline importances from dataset at {resolved_path}")
+    feature_names, baseline_importances = load_baseline_importances(resolved_path)
 
     print_progress("Computing standard fuzzy AHP weights")
     fuzzy_matrix = build_fuzzy_pairwise_matrix(baseline_importances)
@@ -270,14 +283,24 @@ def run_fuzzy_ahp_analysis(
     standard_cr = evaluate_consistency(fuzzy_matrix, standard_weights)
 
     print_progress("Optimising weights via Genetic Algorithm")
-    ga_seed_weights = baseline_importances.copy()
+    ga_seed_weights = np.ones(len(feature_names)) / (len(feature_names))
 
     def _fitness(candidate: np.ndarray) -> float:
         weights = candidate / candidate.sum()
-        matrix = weights[:, None] / weights[None, :]
+        # Build a pairwise matrix for FAHP weights
+        n = len(weights)
+        matrix = np.zeros((n,n))
+        for i in range (n):
+            for j in range (n):
+                if weights[j] > 0:
+                    matrix[i,j] = weights[i] / weights[j]
+                else:
+                    matrix[i,j] = 1.0
         cr = calculate_consistency_ratio(matrix, weights)
-        penalty = 0.1 * np.linalg.norm(weights - standard_weights)
-        return cr + penalty
+
+        # Penalise for deviating too much from basline for GA
+        deviation = np.linalg.norm(weights - baseline_importances)
+        return cr + 0.05 * deviation # minimise CR and control the deviation
 
     optimizer = WeightGAOptimizer(GAParameters(random_state=RANDOM_STATE))
     ga_weights = optimizer.optimise(ga_seed_weights, _fitness)
@@ -304,7 +327,7 @@ def run_fuzzy_ahp_analysis(
         top_feature = diff_summary["changed_features"][0]
         print_progress(
             f"Greatest GA shift observed on '{top_feature['feature']}' "
-            f"with Δ={top_feature['delta']:.4f}"
+            f"with ={top_feature['delta']:.4f}"
         )
     else:
         print_progress("GA optimisation produced negligible changes to weights")

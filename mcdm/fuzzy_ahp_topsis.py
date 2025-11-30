@@ -4,14 +4,25 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT))
 
+import config
 from mcdm.fuzzy_ahp import run_fuzzy_ahp_analysis
 from mcdm.fuzzy_evaluation import FuzzyPipelineEvaluator
 from mcdm.fuzzy_topsis import run_fuzzy_topsis
-from src.utils import ensure_directory, print_progress, print_section_header  # type: ignore[import]
 
 PIPELINE_REPORT_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_topsis_results.json"
+DEFAULT_DATASET_PATH = Path(config.ENGINEERED_DATA_PATH)
+
+def ensure_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+def print_section_header(title: str) -> None:
+    border = "=" * len(title)
+    print(f"\n{border}\n{title}\n{border}")
+
+def print_progress(message: str) -> None:
+    print(f"[progress] {message}")
 
 def persist_pipeline_summary(summary: dict) -> None:
     ensure_directory(PIPELINE_REPORT_PATH.parent)
@@ -28,10 +39,11 @@ def persist_pipeline_summary(summary: dict) -> None:
         json.dump(existing, handle, indent=2)
     print_progress(f"Pipeline summary written to {PIPELINE_REPORT_PATH}")
 
-
-def main() -> None:
-    print_section_header("Running Fuzzy AHP → Fuzzy TOPSIS pipeline")
-    ahp_output = run_fuzzy_ahp_analysis()
+def main(dataset_path: Path | str | None = None) -> None:
+    resolved_dataset = Path(dataset_path) if dataset_path is not None else DEFAULT_DATASET_PATH
+    print_section_header("Running Fuzzy AHP-TOPSIS pipeline")
+    print_progress(f"Using dataset at {resolved_dataset}")
+    ahp_output = run_fuzzy_ahp_analysis(dataset_path=resolved_dataset)
     topsis_output = run_fuzzy_topsis(weights_data=ahp_output["weights_payload"])
 
     evaluator = FuzzyPipelineEvaluator(
@@ -62,7 +74,6 @@ def main() -> None:
         print_progress("No differences detected in top-ranked supplier-commodity pairs")
 
     persist_pipeline_summary(report)
-
 
 if __name__ == "__main__":
     main()
