@@ -62,7 +62,7 @@ IMBLEARN_SAMPLER_CONFIG = {
 }
 
 # Constraint columns that must maintain valid combinations
-CONSTRAINT_COLUMNS = ["Supplier_Name", "Country", "Region"]
+CONSTRAINT_COLUMNS = ["Supplier_Name", "Commodity_Name", "Country", "Region"]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,7 +70,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ==================== DATA CLASSES ====================
 @dataclass
 class EvaluationResult:
     name: str
@@ -183,7 +182,6 @@ def decode_categorical_features(
     
     return decoded
 
-
 def validate_supplier_location_combinations(
     df: pd.DataFrame,
     original_df: pd.DataFrame,
@@ -218,6 +216,77 @@ def validate_supplier_location_combinations(
         )
     
     return valid_df
+
+# Add this new function after validate_supplier_location_combinations():
+
+# Add back Supplier_Name and Commodity_Name
+def reassign_identifier_columns(
+    resampled_df: pd.DataFrame,
+    original_df: pd.DataFrame,
+    identifier_cols: List[str] = None,
+    matching_cols: List[str] = None,
+) -> pd.DataFrame:
+    if identifier_cols is None:
+        identifier_cols = ['Supplier_Name', 'Commodity_Name']
+    
+    if matching_cols is None:
+        matching_cols = [col for col in CONSTRAINT_COLUMNS if col in resampled_df.columns]
+    
+    # Filter to only existing columns
+    identifier_cols = [col for col in identifier_cols if col in original_df.columns]
+    matching_cols = [col for col in matching_cols if col in resampled_df.columns and col in original_df.columns]
+    
+    if not identifier_cols:
+        logger.warning("No identifier columns found in original dataset")
+        return resampled_df
+    
+    if not matching_cols:
+        logger.warning("No matching columns available for identifier reassignment")
+        return resampled_df
+    
+    logger.info("Reassigning identifier columns: %s", identifier_cols)
+    logger.info("Using matching columns: %s", matching_cols)
+    
+    # Create lookup table from original data
+    lookup_cols = matching_cols + identifier_cols
+    lookup_table = original_df[lookup_cols].drop_duplicates(subset=matching_cols)
+    
+    # Count unique combinations
+    original_combos = len(original_df[matching_cols].drop_duplicates())
+    lookup_combos = len(lookup_table)
+    
+    if lookup_combos < original_combos:
+        logger.warning(
+            "Multiple identifier combinations exist for some matching keys. "
+            "Using first occurrence. (%d unique combos → %d in lookup)",
+            original_combos, lookup_combos
+        )
+    
+    # Merge to add identifiers
+    result_df = resampled_df.merge(
+        lookup_table,
+        on=matching_cols,
+        how='left'
+    )
+    
+    # Check for missing identifiers
+    missing_mask = result_df[identifier_cols].isnull().any(axis=1)
+    missing_count = missing_mask.sum()
+    
+    if missing_count > 0:
+        logger.warning(
+            "Could not match identifiers for %d samples (%.1f%%). Filling with 'Unknown'.",
+            missing_count,
+            (missing_count / len(result_df)) * 100
+        )
+        
+        for col in identifier_cols:
+            result_df[col] = result_df[col].fillna(f"Unknown_{col}")
+    
+    logger.info("Successfully reassigned identifier columns to %d samples", len(result_df))
+    
+    return result_df
+
 
 # Reassign SC_ID columns after oversampling
 def add_sc_id_column(df: pd.DataFrame, start_from: int = 1) -> pd.DataFrame:
@@ -609,9 +678,17 @@ def run_oversampling(
     
     logger.info("After validation: %d rows", len(validated_df))
     logger.info("Final class distribution:\n%s", validated_df[TARGET_COLUMN].value_counts())
+
+    # Reassign identifier columns
+    identifier_cols = ['Supplier_Name', 'Commodity_Name']
+    matching_cols = ['Supplier_Name', 'Country', 'Region']
     
     # Add back SC_ID column
     validated_df = add_sc_id_column(validated_df, start_from=1)
+
+    original_col_order = [col for col in original_data.columns if col in validated_df.columns]
+    new_cols = [col for col in validated_df.columns if col not in original_col_order]
+    validated_df = validated_df[['SC_ID'] + original_col_order + new_cols]
     
     # Save results
     output_path = PROCESSED_DATA_DIR / f"oversampled_{best_result.name.lower()}.csv"

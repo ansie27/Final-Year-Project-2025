@@ -3,7 +3,7 @@ import sys
 from dataclasses import dataclass
 from functools import reduce
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -11,13 +11,13 @@ from prettytable import PrettyTable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
 from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
 from utils.fuzzy_operations import TriangularFuzzyNumber, calculate_consistency_ratio
 
-ENGINEERED_DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
+DEFAULT_DATASET_PATH = Path(config.ENGINEERED_DATA_PATH)
 CRITICAL_FEATURES_PATH = PROJECT_ROOT / "outputs" / "critical_features.json"
 VISUALIZATION_PATH = PROJECT_ROOT / "outputs" / "visualizations" / "fuzzy_ahp_results.png"
 WEIGHTS_OUTPUT_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_weights.json"
@@ -92,13 +92,14 @@ def ratio_to_fuzzy_saathy(ratio: float) -> TriangularFuzzyNumber:
     return TriangularFuzzyNumber.from_saaty_scale(9)
 
 def load_baseline_importances(
-    dataset_path: Path = ENGINEERED_DATA_PATH,
+    dataset_path: Optional[Path | str] = None,
 ) -> Tuple[List[str], np.ndarray]:
+    resolved_path = Path(dataset_path) if dataset_path is not None else DEFAULT_DATASET_PATH
 
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Engineered dataset not found at {dataset_path}")
+    if not resolved_path.exists():
+        raise FileNotFoundError(f"Dataset not found at {resolved_path}")
 
-    df = pd.read_csv(dataset_path)
+    df = pd.read_csv(resolved_path)
     candidate_features = [
         col for col in getattr(config, "FEATURE_COLUMNS", []) if col in df.columns
     ]
@@ -269,11 +270,12 @@ def summarise_weight_differences(
 
 # Execute FAHP
 def run_fuzzy_ahp_analysis(
-    dataset_path: Path = ENGINEERED_DATA_PATH,
+    dataset_path: Optional[Path | str] = None,
 ) -> Dict[str, Any]:
+    resolved_path = Path(dataset_path) if dataset_path is not None else DEFAULT_DATASET_PATH
     print_section_header("Fuzzy AHP and GA-optimised Analysis")
-    print_progress("Deriving baseline importances from engineered dataset")
-    feature_names, baseline_importances = load_baseline_importances(dataset_path)
+    print_progress(f"Deriving baseline importances from dataset at {resolved_path}")
+    feature_names, baseline_importances = load_baseline_importances(resolved_path)
 
     print_progress("Computing standard fuzzy AHP weights")
     fuzzy_matrix = build_fuzzy_pairwise_matrix(baseline_importances)

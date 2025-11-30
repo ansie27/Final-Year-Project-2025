@@ -9,7 +9,7 @@ from prettytable import PrettyTable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
 from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
@@ -50,7 +50,6 @@ def load_weights(path: Path) -> Dict[str, Dict[str, Sequence[Dict[str, float]]]]
     if "standard" not in data or "ga_optimised" not in data:
         raise ValueError("Weights file must include 'standard' and 'ga_optimised' sections.")
     return data
-
 
 def load_dataset(path: Path, columns: Sequence[str]) -> pd.DataFrame:
     if not path.exists():
