@@ -18,6 +18,15 @@ function setActiveTab(tabId) {
   });
 }
 
+function hexToRgba(hex, alpha) {
+  const sanitized = hex.replace("#", "");
+  const bigint = parseInt(sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 async function loadTabContent(tabId) {
   const response = await fetch(`/tabs/${tabId}.html`);
   const html = await response.text();
@@ -49,6 +58,7 @@ async function initOverviewTab() {
     loadTopCommodities(region),
     loadTopMovers(region),
     renderForecastChart(),
+    renderCarbonTrajectoryChart(),
     renderTrendChart(),
   ]);
 }
@@ -98,6 +108,11 @@ async function fetchRegionOptions() {
 
 async function fetchForecastData() {
   const response = await fetch("/api/forecast-data");
+  return response.json();
+}
+
+async function fetchCarbonTrajectory() {
+  const response = await fetch("/api/carbon-trajectory");
   return response.json();
 }
 
@@ -387,35 +402,130 @@ async function renderForecastChart() {
   Plotly.react(node, data, layout, config);
 }
 
+async function renderCarbonTrajectoryChart() {
+  const node = document.getElementById("carbon-trajectory-chart");
+  if (!node) return;
+
+  const payload = await fetchCarbonTrajectory();
+  const data = [
+    {
+      x: payload.months,
+      y: payload.values,
+      type: "bar",
+      marker: {
+        color: "#2e86ab",
+        line: { color: "#1f618d", width: 1 },
+      },
+    },
+  ];
+
+  const layout = {
+    margin: { t: 10, r: 10, b: 40, l: 50 },
+    yaxis: {
+      title: "Projected Intensity (index)",
+      gridcolor: "#edf1fa",
+      range: [0, 110],
+    },
+    xaxis: { title: "Months Ahead", gridcolor: "#edf1fa" },
+    height: 220,
+  };
+
+  const config = {
+    displayModeBar: false,
+    responsive: true,
+  };
+
+  Plotly.react(node, data, layout, config);
+}
+
 async function renderTrendChart() {
   const node = document.getElementById("trend-chart");
   if (!node) return;
 
   const trendData = await fetchTrendData();
 
-  const data = trendData.series.map((s) => ({
-    x: s.x,
-    y: s.y,
-    mode: "lines",
-    name: s.name,
-    line: {
-      color: s.color,
-      width: 3,
-    },
-  }));
+  const traces = [];
+
+  (trendData.series || []).forEach((serie) => {
+    if (serie.actual?.x?.length && serie.actual?.y?.length) {
+      traces.push({
+        x: serie.actual.x,
+        y: serie.actual.y,
+        mode: "lines",
+        name: `${serie.name} (Actual)`,
+        line: {
+          color: serie.color,
+          width: 3,
+        },
+      });
+    }
+
+    if (serie.forecast?.x?.length && serie.forecast?.y?.length) {
+      const lastActualYear =
+        serie.actual?.x?.length > 0
+          ? serie.actual.x[serie.actual.x.length - 1]
+          : null;
+      const lastActualValue =
+        serie.actual?.y?.length > 0
+          ? serie.actual.y[serie.actual.y.length - 1]
+          : null;
+
+      const forecastX =
+        lastActualYear !== null
+          ? [lastActualYear, ...serie.forecast.x]
+          : serie.forecast.x;
+      const forecastY =
+        lastActualValue !== null
+          ? [lastActualValue, ...serie.forecast.y]
+          : serie.forecast.y;
+
+      traces.push({
+        x: forecastX,
+        y: forecastY,
+        mode: "lines",
+        name: `${serie.name} Forecast`,
+        line: {
+          color: serie.color,
+          width: 3,
+          dash: "dot",
+        },
+      });
+    }
+
+    if (
+      serie.confidence?.x?.length &&
+      serie.confidence.upper?.length === serie.confidence.x.length &&
+      serie.confidence.lower?.length === serie.confidence.x.length
+    ) {
+      const xVals = serie.confidence.x;
+      traces.push({
+        x: [...xVals, ...xVals.slice().reverse()],
+        y: [
+          ...serie.confidence.upper,
+          ...serie.confidence.lower.slice().reverse(),
+        ],
+        fill: "toself",
+        fillcolor: hexToRgba(serie.color, 0.15),
+        line: { color: "transparent" },
+        hoverinfo: "skip",
+        showlegend: false,
+      });
+    }
+  });
 
   const layout = {
     margin: { t: 20, r: 10, b: 30, l: 40 },
     legend: {
       orientation: "h",
-      y: -0.2,
+      y: -0.25,
     },
     xaxis: {
-      title: "",
+      title: "Year",
       gridcolor: "#edf1fa",
     },
     yaxis: {
-      title: "",
+      title: "Score (0-100)",
+      range: [0, 100],
       gridcolor: "#edf1fa",
     },
   };
@@ -425,7 +535,7 @@ async function renderTrendChart() {
     responsive: true,
   };
 
-  Plotly.react(node, data, layout, config);
+  Plotly.react(node, traces, layout, config);
 }
 
 function attachOverviewHandlers() {

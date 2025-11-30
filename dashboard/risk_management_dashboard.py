@@ -1,10 +1,15 @@
 import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import pandas as pd
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
+import pandas as pd
 from flask import Flask, jsonify, request, send_from_directory
+
+try:
+    from statsmodels.tsa.arima.model import ARIMA  # type: ignore
+except ImportError:
+    ARIMA = None
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -166,6 +171,18 @@ TREND_SERIES = [
     ("GHG Scope 2", "GHG_Scope2_Intensity", "#9b59b6"),
     ("Renewable Energy Usage", "Renewable_Energy_Usage", "#f39c12"),
 ]
+CARBON_TRAJECTORY_FEATURES = [
+    "Carbon_Emission_Intensity",
+    "Renewable_Energy_Usage",
+    "Emission_Per_Dollar",
+    "Green_Efficiency_Score",
+]
+TREND_FEATURES = [
+    ("ESG Score", "ESG_Score", "#1f77b4"),
+    ("Environmental Score", "Environmental_Score", "#2ca02c"),
+    ("Social Score", "Social_Score", "#ff7f0e"),
+    ("Governance Score", "Governance_Score", "#9467bd"),
+]
 FALLBACK_COMMODITIES = [
     {"name": "Commodity Y", "sustainability": 72, "ghg_score": 0.89, "cost": 4.8},
     {"name": "Commodity X", "sustainability": 47, "ghg_score": 0.89, "cost": 5.3},
@@ -323,6 +340,43 @@ def build_risk_distribution(df: pd.DataFrame) -> Dict[str, Any]:
     return {"values": values, "labels": labels, "colors": colors}
 
 
+def _forecast_series(series: pd.Series, steps: int = 2) -> Tuple[List[int], List[float], List[float], List[float]]:
+    series = series.dropna()
+    if series.empty:
+        return [], [], [], []
+
+    last_year = int(series.index.astype(int).max())
+    forecast_years = [last_year + i for i in range(1, steps + 1)]
+
+    def _fallback(value: float) -> Tuple[List[int], List[float], List[float], List[float]]:
+        base = float(value)
+        values = []
+        upper = []
+        lower = []
+        current = base
+        for _ in range(steps):
+            current = max(0.0, min(100.0, current - 1.5))
+            values.append(round(current, 2))
+            upper.append(min(100.0, current + 3))
+            lower.append(max(0.0, current - 3))
+        return forecast_years, values, upper, lower
+
+    if ARIMA is None or len(series) < 3:
+        return _fallback(series.iloc[-1])
+
+    try:
+        model = ARIMA(series, order=(1, 1, 0))
+        fitted = model.fit()
+        forecast = fitted.get_forecast(steps=steps)
+        predicted = forecast.predicted_mean.clip(0, 100).round(2).tolist()
+        conf_int = forecast.conf_int(alpha=0.2)
+        lower = conf_int.iloc[:, 0].clip(0, 100).round(2).tolist()
+        upper = conf_int.iloc[:, 1].clip(0, 100).round(2).tolist()
+        return forecast_years, predicted, upper, lower
+    except Exception:
+        return _fallback(series.iloc[-1])
+
+
 def build_overview_summary(dataset: pd.DataFrame, region: Optional[str] = None) -> Dict[str, Any]:
     dataset = filter_by_region(dataset, region)
     if dataset.empty:
@@ -426,26 +480,100 @@ def build_top_movers(dataset: pd.DataFrame, limit: int = 5, region: Optional[str
 
 def build_forecast_payload(dataset: pd.DataFrame) -> Dict[str, Any]:
     if dataset.empty:
-        return {"values": [14, 48, 38], "labels": RISK_LABELS, "colors": [RISK_COLOR_MAP[label] for label in RISK_LABELS]}
+        return {
+            "values": [1, 1, 1],
+            "labels": RISK_LABELS,
+            "colors": [RISK_COLOR_MAP[label] for label in RISK_LABELS],
+        }
 
-    if "Risk_Classification" not in dataset.columns:
-        dataset = compute_risk_scores(dataset)
+    dataset = compute_risk_scores(dataset)
 
-    year_col = _first_available_column(dataset, ["Year"])
-    if not year_col:
+    required_cols = [
+        "Risk_Classification",
+        "ESG_Score",
+        "Compliance_Level",
+        "Financial_Stability_Score",
+    ]
+    missing = [col for col in required_cols if col not in dataset.columns]
+    if missing:
         counts = dataset["Risk_Classification"].value_counts().reindex(RISK_LABELS, fill_value=0)
-    else:
-        years = _safe_series(dataset[year_col]).dropna()
-        if years.empty:
-            counts = dataset["Risk_Classification"].value_counts().reindex(RISK_LABELS, fill_value=0)
-        else:
-            latest_year = int(years.max())
-            subset = dataset.loc[years.index[years == latest_year]]
-            counts = subset["Risk_Classification"].value_counts().reindex(RISK_LABELS, fill_value=0)
+        colors = [RISK_COLOR_MAP.get(label, "#d9d9d9") for label in counts.index.tolist()]
+        return {"values": counts.tolist(), "labels": counts.index.tolist(), "colors": colors}
 
-    labels = counts.index.tolist()
+    data = dataset[required_cols].dropna()
+    data["Risk_Flag"] = data["Risk_Classification"].map(
+        {"High": 2, "Moderate": 1, "Low": 0}
+    )
+    data = data.dropna(subset=["Risk_Flag"])
+
+    weights = np.array([0.4, 0.3, 0.3])
+    min_values = data[["ESG_Score", "Compliance_Level", "Financial_Stability_Score"]].min()
+    max_values = data[["ESG_Score", "Compliance_Level", "Financial_Stability_Score"]].max()
+    normalized = (data[["ESG_Score", "Compliance_Level", "Financial_Stability_Score"]] - min_values) / (
+        max_values - min_values
+    )
+    normalized = normalized.fillna(0.5)
+    composite = normalized.to_numpy() @ weights
+
+    thresholds = np.quantile(composite, [0.33, 0.66])
+
+    projections = pd.Series(index=RISK_LABELS, data=0, dtype=float)
+    for value in composite:
+        if value <= thresholds[0]:
+            projections["Low"] += 1
+        elif value <= thresholds[1]:
+            projections["Moderate"] += 1
+        else:
+            projections["High"] += 1
+
+    labels = projections.index.tolist()
     colors = [RISK_COLOR_MAP.get(label, "#d9d9d9") for label in labels]
-    return {"values": counts.tolist(), "labels": labels, "colors": colors}
+    return {"values": projections.tolist(), "labels": labels, "colors": colors}
+
+
+def build_carbon_trajectory_payload(dataset: pd.DataFrame) -> Dict[str, Any]:
+    if dataset.empty:
+        months = [f"M{i}" for i in range(1, 13)]
+        values = [max(0, 100 - i * 3) for i in range(12)]
+        return {"months": months, "values": values}
+
+    missing = [col for col in CARBON_TRAJECTORY_FEATURES if col not in dataset.columns]
+    if missing:
+        months = [f"M{i}" for i in range(1, 13)]
+        values = [max(0, 100 - i * 3) for i in range(12)]
+        return {"months": months, "values": values}
+
+    data = dataset[CARBON_TRAJECTORY_FEATURES].dropna()
+    if data.empty:
+        months = [f"M{i}" for i in range(1, 13)]
+        values = [max(0, 100 - i * 3) for i in range(12)]
+        return {"months": months, "values": values}
+
+    normalized = data.copy()
+    for column in CARBON_TRAJECTORY_FEATURES:
+        series = _safe_series(normalized[column])
+        min_val, max_val = series.min(), series.max()
+        if np.isclose(max_val - min_val, 0):
+            normalized[column] = 0.5
+        else:
+            normalized[column] = (series - min_val) / (max_val - min_val)
+
+    base_intensity = normalized["Carbon_Emission_Intensity"].mean()
+    renewable_factor = normalized["Renewable_Energy_Usage"].mean()
+    emission_per_dollar = normalized["Emission_Per_Dollar"].mean()
+    efficiency = normalized["Green_Efficiency_Score"].mean()
+    base_intensity = 1.0 if np.isnan(base_intensity) else base_intensity
+
+    months = [f"M{i}" for i in range(1, 13)]
+    values = []
+    current = base_intensity if not np.isnan(base_intensity) else 1.0
+    for idx in range(12):
+        reduction = 0.02 + renewable_factor * 0.03 + efficiency * 0.02
+        penalty = emission_per_dollar * 0.02
+        current = max(0.05, current * (1 - reduction + penalty))
+        values.append(round(float(current * 100), 2))
+
+    return {"months": months, "values": values}
 
 
 def build_trend_payload(dataset: pd.DataFrame) -> Dict[str, Any]:
@@ -457,28 +585,31 @@ def build_trend_payload(dataset: pd.DataFrame) -> Dict[str, Any]:
         return {"series": []}
 
     years = pd.to_numeric(_safe_series(dataset[year_col]), errors="coerce")
-    years = years.round().astype("Int64")
-    dataset = dataset.assign(__year=years)
+    dataset = dataset.assign(__year=years.round().astype("Int64"))
     dataset = dataset.dropna(subset=["__year"])
 
     if dataset.empty:
         return {"series": []}
 
-    grouped = dataset.groupby("__year").mean(numeric_only=True)
+    grouped = dataset.groupby("__year").mean(numeric_only=True).sort_index()
     series_payload = []
 
-    for label, column, color in TREND_SERIES:
+    for label, column, color in TREND_FEATURES:
         if column not in grouped.columns:
             continue
         values = grouped[column].dropna()
         if values.empty:
             continue
+        actual_years = values.index.astype(int).tolist()
+        actual_values = values.clip(0, 100).round(2).tolist()
+        forecast_years, forecast_values, upper, lower = _forecast_series(values)
         series_payload.append(
             {
                 "name": label,
                 "color": color,
-                "x": values.index.astype(int).tolist(),
-                "y": [round(float(val), 2) for val in values.tolist()],
+                "actual": {"x": actual_years, "y": actual_values},
+                "forecast": {"x": forecast_years, "y": forecast_values},
+                "confidence": {"x": forecast_years, "upper": upper, "lower": lower},
             }
         )
 
@@ -702,7 +833,6 @@ def api_top_movers():
 
 @app.route("/api/forecast-data")
 def api_forecast_data():
-    """Return 2026 forecast distribution."""
     dataset = get_dashboard_dataset()
     payload = build_forecast_payload(dataset)
     return jsonify(payload)
@@ -713,6 +843,14 @@ def api_trend_data():
     """Return sustainability trend time series."""
     dataset = get_dashboard_dataset()
     payload = build_trend_payload(dataset)
+    return jsonify(payload)
+
+
+@app.route("/api/carbon-trajectory")
+def api_carbon_trajectory():
+    """Return projected carbon neutrality trajectory."""
+    dataset = get_dashboard_dataset()
+    payload = build_carbon_trajectory_payload(dataset)
     return jsonify(payload)
 
 @app.route("/api/region-summaries")

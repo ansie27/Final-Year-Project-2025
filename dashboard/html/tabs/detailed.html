@@ -1,28 +1,92 @@
-<div class="content-detailed">
-  <section class="card detail-card">
-    <h2>Supplier &amp; Commodity Insights</h2>
-    <p>
-      Coming soon: interactive drill-downs for supplier criticality,
-      commodity exposure, and tiered mitigation plans.
-    </p>
-    <ul>
-      <li>Blend risk scores with logistics lead times.</li>
-      <li>Surface ESG exceptions by supplier cluster.</li>
-      <li>Export findings for cross-functional reviews.</li>
-    </ul>
+<div class="detailed-dashboard">
+  <div class="filter-bar">
+    <div class="filter-copy">
+      <h2>Supplier Risk Profile</h2>
+      <p>Insights derived from engineered_supplier_commodity_features.csv</p>
+    </div>
+    <div class="search-box">
+      <label class="sr-only" for="supplier-search">Search supplier</label>
+      <input
+        type="search"
+        id="supplier-search"
+        placeholder="Search supplier (e.g., KLABIN S.A.)"
+        aria-label="Search supplier"
+      />
+      <button type="button">Search</button>
+    </div>
+  </div>
+
+  <section class="card credentials-card">
+    <div>
+      <p class="credentials-label">Supplier</p>
+      <h3 class="credentials-name">KLABIN S.A.</h3>
+      <p class="credentials-meta">
+        Industrial Manufacturing &amp; Construction · Tier 1 · 20,275 employees
+      </p>
+    </div>
+    <div class="credentials-meta-list">
+      <div>
+        <span class="meta-label">HQ</span>
+        <span>São Paulo, Brazil</span>
+      </div>
+      <div>
+        <span class="meta-label">Primary Commodity</span>
+        <span>Paperboard, kraft paper, packaging</span>
+      </div>
+      <div>
+        <span class="meta-label">Certifications</span>
+        <span>FSC · RSPO · ISO 9001</span>
+      </div>
+    </div>
   </section>
 
-  <section class="card detail-card">
-    <h2>Regional Alerts</h2>
-    <p>
-      Monitor regulatory changes, climate disruptions, and geopolitical events for
-      proactive scenario planning.
-    </p>
-    <ul>
-      <li>Live alert feeds from curated data partners.</li>
-      <li>Auto-tagged to your configured supplier regions.</li>
-      <li>Escalation-ready summaries for leadership.</li>
-    </ul>
-  </section>
-</div>
+  <div class="profile-grid">
+    <section class="card risk-summary-card">
+      <h2>Supplier Risk Summary</h2>
+      <div class="risk-summary-content">
+        <div class="risk-gauge">
+          <div class="risk-gauge-ring">
+            <span>78</span>
+          </div>
+          <p>Overall Risk Index</p>
+        </div>
+        <div class="risk-details">
+          <div>
+            <p class="risk-rating-label">Classification</p>
+            <h3 class="risk-rating-value">Medium</h3>
+          </div>
+          <div class="risk-metrics">
+            <div><span>ESG Score</span><strong>65</strong></div>
+            <div><span>Compliance Level</span><strong>80</strong></div>
+            <div><span>Financial Stability</span><strong>70</strong></div>
+            <div><span>Resilience Score</span><strong>75</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
+    <section class="card risk-trend-card">
+      <div class="card-header">
+        <h2>Risk Trend + Forecast</h2>
+        <p class="card-subtext">Quarterly scores with 2026 outlook</p>
+      </div>
+      <div id="detailed-risk-trend" class="line-chart" aria-label="Risk trend forecast chart"></div>
+    </section>
+
+    <section class="card esg-breakdown-card">
+      <div class="card-header">
+        <h2>ESG Breakdown</h2>
+        <p class="card-subtext">Weighted out of 100</p>
+      </div>
+      <div id="esg-breakdown-chart" class="bar-chart" aria-label="ESG breakdown chart"></div>
+    </section>
+
+    <section class="card reliability-card">
+      <h2>Operational Reliability</h2>
+      <ul>
+        <li><span>On-Time Delivery</span><strong>95%</strong></li>
+        <li><span>Defect Rate</span><strong>2%</strong></li>
+        <li><span>Lead Time Capacity Ratio</span><strong>0.30</strong></li>
+        <li><span>Operational Index</span><strong>0.95</strong></li>
+      </ul>
+    </section>
