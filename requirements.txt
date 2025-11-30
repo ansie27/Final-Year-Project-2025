@@ -31,6 +31,8 @@ pycountry>=24.5.1
 python-dotenv>=1.0.0
 utils>=1.0.0
 
+statsmodels>=0.14.0
+
 # Testing (optional, for development)
 pytest>=7.4.0
 pytest-cov>=4.1.0

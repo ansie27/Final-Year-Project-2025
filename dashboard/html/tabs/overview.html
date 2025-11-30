@@ -26,6 +26,11 @@
         class="donut-chart"
         aria-label="Risk composition chart"
       ></div>
+      <div class="risk-legend">
+        <span><span class="legend-dot high"></span>High</span>
+        <span><span class="legend-dot medium"></span>Moderate</span>
+        <span><span class="legend-dot low"></span>Low</span>
+      </div>
     </div>
 
     <div class="metric-block compliance-metric">
@@ -132,24 +137,36 @@
     </div>
   </section>
 
-  <section class="card forecast-card">
-    <h2>2026 Forecast</h2>
-    <div
-      id="forecast-chart"
-      class="donut-chart"
-      aria-label="2026 forecast chart"
-    ></div>
-    <div class="forecast-legend">
-      <span><span class="legend-dot high"></span>High</span>
-      <span><span class="legend-dot medium"></span>Moderate</span>
-      <span><span class="legend-dot low"></span>Low</span>
+  <section class="card projection-column">
+    <h2>Forecasts for 2026</h2>
+    <div class="projection-block">
+      <h2>Projected Risk Distribution (Next 6 Months)</h2>
+      <div
+        id="forecast-chart"
+        class="donut-chart"
+        aria-label="Projected risk distribution chart"
+      ></div>
+      <div class="forecast-legend">
+        <span><span class="legend-dot high"></span>High</span>
+        <span><span class="legend-dot medium"></span>Moderate</span>
+        <span><span class="legend-dot low"></span>Low</span>
+      </div>
+    </div>
+
+    <div class="projection-block">
+      <h2>Carbon Neutrality Trajectory</h2>
+      <div
+        id="carbon-trajectory-chart"
+        class="line-chart"
+        aria-label="Projected carbon neutrality trajectory chart"
+      ></div>
     </div>
   </section>
 </div>
 
 <div class="overview-trends-grid">
   <section class="card trends-card">
-    <h2>Sustainability Trends</h2>
-    <div id="trend-chart" class="line-chart" aria-label="Sustainability trends"></div>
+    <h2>Supplier Sustainability Trends</h2>
+    <div id="trend-chart" class="line-chart" aria-label="Supplier sustainability trends"></div>
   </section>
 </div>
