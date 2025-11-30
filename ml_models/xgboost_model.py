@@ -29,7 +29,7 @@ import config
 if str(PROJECT_ROOT / "utils") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "utils"))
 
-from model_evaluation_utils import (
+from ml_models.model_evaluation_utils import (
     ensure_probability_matrix,
     evaluate_classification_metrics,
 )

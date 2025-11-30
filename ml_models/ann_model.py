@@ -30,7 +30,7 @@ utils_path = PROJECT_ROOT / "utils"
 if str(utils_path) not in sys.path:
     sys.path.insert(0, str(utils_path))
 
-from model_evaluation_utils import (
+from ml_models.model_evaluation_utils import (
     ensure_probability_matrix,
     evaluate_classification_metrics,
 )

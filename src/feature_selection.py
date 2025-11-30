@@ -2,7 +2,6 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -27,8 +26,6 @@ from ml_models.random_forest_model import (
     run_random_forest_training,
 )
 from ml_models.xgboost_model import XGBoostTrainingConfig, run_xgboost_training
-from src.utils import ensure_directory, print_progress, print_section_header
-
 
 DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "visualizations"
@@ -67,6 +64,22 @@ TOP_FEATURE_RESULT_PATHS: Dict[str, Path] = {
     "xgboost": config.MODELS_DIR / "xgboost_top_features.yaml",
     "ann": config.MODELS_DIR / "ann_top_features.yaml",
 }
+
+
+def ensure_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def print_section_header(title: str) -> None:
+    border = "=" * len(title)
+    print(f"\n{border}\n{title}\n{border}")
+
+
+def print_progress(message: str, step: Optional[int] = None, total: Optional[int] = None) -> None:
+    prefix = "[progress]"
+    if step is not None and total is not None:
+        prefix += f" ({step}/{total})"
+    print(f"{prefix} {message}")
 
 
 def load_dataset(path: Path) -> pd.DataFrame:
