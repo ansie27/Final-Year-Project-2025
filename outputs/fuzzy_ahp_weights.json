@@ -2,283 +2,299 @@
   "standard": {
     "weights": [
       {
+        "feature": "Supplier_Name",
+        "weight": 0.027777777777777776
+      },
+      {
+        "feature": "Commodity_Name",
+        "weight": 0.027777777777777776
+      },
+      {
         "feature": "Year",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Month",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Country",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Region",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Industry_Sector",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Supplier_Tier",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "ESG_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Environmental_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Social_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Governance_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Carbon_Emission_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "GHG_Scope1_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "GHG_Scope2_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "GHG_Scope3_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Water_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Waste_Management_Efficiency",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Renewable_Energy_Usage",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Compliance_Level",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Sustainability_Report_Availability",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Certifications_Active",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Lead_Time_Days",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Production_Capacity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "On_Time_Delivery_Rate",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Defect_Rate",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Incident_History_Count",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Labour_Compliance_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Diversity_Index",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Financial_Stability_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Freight_Cost",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Cost_Index",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Commodity_Price_Index",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Commodity_Demand",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Trade_Volume",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Logistics_Distance_km",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       }
     ],
-    "consistency_ratio": 0.0
+    "consistency_ratio": 1.3444517232925264e-16
   },
   "ga_optimised": {
     "weights": [
       {
+        "feature": "Supplier_Name",
+        "weight": 0.027777777777777776
+      },
+      {
+        "feature": "Commodity_Name",
+        "weight": 0.027777777777777776
+      },
+      {
         "feature": "Year",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Month",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Country",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Region",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Industry_Sector",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Supplier_Tier",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "ESG_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Environmental_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Social_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Governance_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Carbon_Emission_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "GHG_Scope1_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "GHG_Scope2_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "GHG_Scope3_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Water_Intensity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Waste_Management_Efficiency",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Renewable_Energy_Usage",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Compliance_Level",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Sustainability_Report_Availability",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Certifications_Active",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Lead_Time_Days",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Production_Capacity",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "On_Time_Delivery_Rate",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Defect_Rate",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Incident_History_Count",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Labour_Compliance_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Diversity_Index",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Financial_Stability_Score",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Freight_Cost",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Cost_Index",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Commodity_Price_Index",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Commodity_Demand",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Trade_Volume",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       },
       {
         "feature": "Logistics_Distance_km",
-        "weight": 0.029411764705882353
+        "weight": 0.027777777777777776
       }
     ],
-    "consistency_ratio": 0.0
+    "consistency_ratio": 1.3444517232925264e-16
   }
 }

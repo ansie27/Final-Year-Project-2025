@@ -18,7 +18,7 @@ from config import (
 )
 import logging
 
-DEFAULT_INPUT_PATH = PROCESSED_DATA_DIR / "oversampled_smotenc.csv"
+DEFAULT_INPUT_PATH = PROCESSED_DATA_DIR / "oversampled_adasyn.csv"
 FEATURE_OUTPUT_PATH = Path(ENGINEERED_DATA_PATH)
 
 COMPLIANCE_MAX = 3

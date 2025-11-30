@@ -1,138 +1,146 @@
 [
   {
+    "feature": "Supplier_Name",
+    "importance": 0.027777777777777776
+  },
+  {
+    "feature": "Commodity_Name",
+    "importance": 0.027777777777777776
+  },
+  {
     "feature": "Year",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Month",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Country",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Region",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Industry_Sector",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Supplier_Tier",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "ESG_Score",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Environmental_Score",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Social_Score",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Governance_Score",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Carbon_Emission_Intensity",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "GHG_Scope1_Intensity",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "GHG_Scope2_Intensity",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "GHG_Scope3_Intensity",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Water_Intensity",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Waste_Management_Efficiency",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Renewable_Energy_Usage",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Compliance_Level",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Sustainability_Report_Availability",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Certifications_Active",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Lead_Time_Days",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Production_Capacity",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "On_Time_Delivery_Rate",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Defect_Rate",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Incident_History_Count",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Labour_Compliance_Score",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Diversity_Index",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Financial_Stability_Score",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Freight_Cost",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Cost_Index",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Commodity_Price_Index",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Commodity_Demand",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Trade_Volume",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   },
   {
     "feature": "Logistics_Distance_km",
-    "importance": 0.029411764705882353
+    "importance": 0.027777777777777776
   }
 ]
