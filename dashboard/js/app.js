@@ -5,6 +5,7 @@ let mapInitialized = false;
 // DOM element references
 let mapContainer;
 let resetButton;
+let regionFilter;
 
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabContent = document.getElementById("tab-content");
@@ -35,17 +36,26 @@ async function loadTabContent(tabId) {
 async function initOverviewTab() {
   mapContainer = document.getElementById("world-map");
   resetButton = document.getElementById("reset-btn");
+  regionFilter = document.getElementById("region-filter");
 
   attachOverviewHandlers();
 
+  await populateRegionFilter();
+  const region = getSelectedRegion();
+
   await Promise.all([
     renderMap(currentRegion),
-    updateOverviewSummary(),
-    loadTopCommodities(),
-    loadTopMovers(),
+    updateOverviewSummary(region),
+    loadTopCommodities(region),
+    loadTopMovers(region),
     renderForecastChart(),
     renderTrendChart(),
   ]);
+}
+
+function getSelectedRegion() {
+  if (!regionFilter) return "All";
+  return regionFilter.value || "All";
 }
 
 async function fetchMapData(region = null) {
@@ -60,18 +70,29 @@ async function fetchRegionInfo(region = null) {
   return response.json();
 }
 
-async function fetchOverviewSummary() {
-  const response = await fetch("/api/overview-summary");
+async function fetchOverviewSummary(region = null) {
+  const query =
+    region && region !== "All" ? `?region=${encodeURIComponent(region)}` : "";
+  const response = await fetch(`/api/overview-summary${query}`);
   return response.json();
 }
 
-async function fetchTopCommodities() {
-  const response = await fetch("/api/top-commodities");
+async function fetchTopCommodities(region = "All") {
+  const query =
+    region && region !== "All" ? `?region=${encodeURIComponent(region)}` : "";
+  const response = await fetch(`/api/top-commodities${query}`);
   return response.json();
 }
 
-async function fetchTopMovers() {
-  const response = await fetch("/api/top-movers");
+async function fetchTopMovers(region = "All") {
+  const query =
+    region && region !== "All" ? `?region=${encodeURIComponent(region)}` : "";
+  const response = await fetch(`/api/top-movers${query}`);
+  return response.json();
+}
+
+async function fetchRegionOptions() {
+  const response = await fetch("/api/regions");
   return response.json();
 }
 
@@ -185,7 +206,7 @@ async function handleMapClick(event) {
   if (!region) return;
 
   currentRegion = region;
-  await renderMap(region);
+  await Promise.all([renderMap(region), updateOverviewSummary(region)]);
 }
 
 function destroyMapListeners() {
@@ -197,11 +218,38 @@ function destroyMapListeners() {
 
 async function resetMap() {
   currentRegion = null;
-  await renderMap();
+  await Promise.all([renderMap(), updateOverviewSummary(getSelectedRegion())]);
 }
 
-async function updateOverviewSummary() {
-  const summary = await fetchOverviewSummary();
+async function populateRegionFilter() {
+  if (!regionFilter) return;
+
+  const data = await fetchRegionOptions();
+  const regions = Array.isArray(data.regions) ? data.regions : [];
+  const options = ["All", ...regions];
+
+  regionFilter.innerHTML = options
+    .map(
+      (region) => `<option value="${region}">${region.toUpperCase()}</option>`
+    )
+    .join("");
+
+  regionFilter.removeEventListener("change", handleRegionFilterChange);
+  regionFilter.addEventListener("change", handleRegionFilterChange);
+}
+
+async function handleRegionFilterChange() {
+  const region = getSelectedRegion();
+  await Promise.all([
+    updateOverviewSummary(region),
+    loadTopCommodities(region),
+    loadTopMovers(region),
+  ]);
+}
+
+async function updateOverviewSummary(regionOverride = null) {
+  const region = regionOverride ?? currentRegion ?? getSelectedRegion();
+  const summary = await fetchOverviewSummary(region);
 
   // Update risk score
   const riskEl = document.getElementById("risk-score-value");
@@ -260,8 +308,8 @@ function renderRiskDonut(distribution) {
   Plotly.react(donutEl, data, layout, config);
 }
 
-async function loadTopCommodities() {
-  const data = await fetchTopCommodities();
+async function loadTopCommodities(region = "All") {
+  const data = await fetchTopCommodities(region);
   const tables = document.querySelectorAll(".table-block table");
   
   if (!tables || tables.length === 0) return;
@@ -283,8 +331,8 @@ async function loadTopCommodities() {
     .join("");
 }
 
-async function loadTopMovers() {
-  const data = await fetchTopMovers();
+async function loadTopMovers(region = "All") {
+  const data = await fetchTopMovers(region);
   const tables = document.querySelectorAll(".table-block table");
 
   if (!tables || tables.length < 2) return;
@@ -297,6 +345,7 @@ async function loadTopMovers() {
       (m) => `
     <tr>
       <td>${m.name}</td>
+      <td>${m.country ?? "N/A"}</td>
       <td>${m.resilience.toFixed(2)}</td>
       <td>${m.risk_delta.toFixed(2)}</td>
     </tr>

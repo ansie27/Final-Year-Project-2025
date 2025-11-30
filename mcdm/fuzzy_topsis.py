@@ -10,7 +10,6 @@ except ImportError:  # pragma: no cover - optional dependency
     torch = None
 import numpy as np
 import pandas as pd
-from prettytable import PrettyTable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -27,7 +26,6 @@ IDENTIFIER_COLUMNS = [
     "Supplier_Name",
     "Commodity_Name",
 ]
-
 
 def _resolve_device(prefer_gpu: bool) -> Optional["torch.device"]:
     if not prefer_gpu or torch is None:
@@ -203,7 +201,7 @@ def sensitivity_analysis(
     correlations = []
     rank_shifts = []
     
-    for i in range(iterations):
+    for i in range(1, iterations + 1):
         # Add Gaussian noise to weights
         noise = np.random.normal(0, perturbation, len(weights))
         perturbed = weights * (1 + noise)
@@ -228,6 +226,9 @@ def sensitivity_analysis(
         shifts = [abs(orig_ranks.get(idx, 10) - pert_ranks.get(idx, 10)) 
                   for idx in set(orig_top10) | set(pert_top10)]
         rank_shifts.append(np.mean(shifts) if shifts else 0)
+
+        if i == 1 or i == iterations or i % 10 == 0:
+            print_progress(f"Sensitivity iterations: {i}/{iterations}")
     
     return {
         "mean_correlation": float(np.mean(correlations)),
@@ -306,50 +307,18 @@ def spearman_correlation(a: np.ndarray, b: np.ndarray) -> float:
 def serialize_tfn(tfn: TriangularFuzzyNumber) -> Tuple[float, float, float]:
     return (tfn.l, tfn.m, tfn.u)
 
-def build_pretty_table(
-    standard_results: List[RankingResult],
-    ga_results: List[RankingResult],
-    limit: int = 10,
-) -> PrettyTable:
-    limit = min(limit, max(len(standard_results), len(ga_results)))
-    table = PrettyTable()
-    table.field_names = [
-        "Rank",
-        "Std Supplier",
-        "Std Commodity",
-        "Std Closeness",
-        "GA Supplier",
-        "GA Commodity",
-        "GA Closeness",
-    ]
-    for idx in range(limit):
-        std_res = standard_results[idx] if idx < len(standard_results) else None
-        ga_res = ga_results[idx] if idx < len(ga_results) else None
-        table.add_row(
-            [
-                idx + 1,
-                std_res.supplier if std_res else "-",
-                std_res.commodity if std_res else "-",
-                f"{std_res.closeness:.4f}" if std_res else "-",
-                ga_res.supplier if ga_res else "-",
-                ga_res.commodity if ga_res else "-",
-                f"{ga_res.closeness:.4f}" if ga_res else "-",
-            ]
-        )
-    return table
-
 def save_rankings_json(
-    standard_results: List[RankingResult],
-    ga_results: List[RankingResult],
+    weight_label: str,
+    results: List[RankingResult],
     fpis: List[TriangularFuzzyNumber],
     fnis: List[TriangularFuzzyNumber],
     output_path: Path,
 ) -> None:
     ensure_directory(output_path.parent)
 
-    def serialize_results(results: List[RankingResult]) -> List[Dict[str, float | str]]:
+    def serialize_results(items: List[RankingResult]) -> List[Dict[str, float | str]]:
         payload = []
-        for rank, item in enumerate(results, start=1):
+        for rank, item in enumerate(items, start=1):
             payload.append(
                 {
                     "rank": rank,
@@ -361,32 +330,31 @@ def save_rankings_json(
         return payload
 
     payload = {
-        "standard": {
-            "ranking": serialize_results(standard_results),
-            "fpis": [serialize_tfn(tfn) for tfn in fpis],
-            "fnis": [serialize_tfn(tfn) for tfn in fnis],
-        },
-        "ga_optimised": {
-            "ranking": serialize_results(ga_results),
-        },
+        "weights_label": weight_label,
+        "ranking": serialize_results(results),
+        "fpis": [serialize_tfn(tfn) for tfn in fpis],
+        "fnis": [serialize_tfn(tfn) for tfn in fnis],
     }
 
     with output_path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
 
-    print_progress(f"Saved final ranking to {output_path}")
-
+    print_progress(f"Saved {weight_label} ranking to {output_path}")
 def run_fuzzy_topsis(
     weights_data: Optional[Dict[str, Dict[str, Sequence[Dict[str, float]]]]] = None,
     data_path: Path = DATA_PATH,
     run_sensitivity: bool = True,
     use_gpu: bool = False,
+    weight_key: str = "standard",
 ) -> Dict[str, Any]:
     print_section_header("Fuzzy TOPSIS Analysis")
     print_progress("Loading weights and dataset")
     weights_data = weights_data or load_weights(WEIGHTS_PATH)
-    standard_weight_entries = weights_data["standard"]["weights"]
-    features = [entry["feature"] for entry in standard_weight_entries]
+    if weight_key not in weights_data or "weights" not in weights_data[weight_key]:
+        raise ValueError(f"Weight key '{weight_key}' not found in weights payload.")
+
+    weight_entries = weights_data[weight_key]["weights"]
+    features = [entry["feature"] for entry in weight_entries]
 
     required_columns = features + IDENTIFIER_COLUMNS
     df = load_dataset(data_path, required_columns)
@@ -415,83 +383,52 @@ def run_fuzzy_topsis(
     suppliers = supplier_series.astype(str).tolist()
     commodities = commodity_series.astype(str).tolist()
 
-    standard_weights = np.array([entry["weight"] for entry in standard_weight_entries], dtype=float)
-    standard_weights = standard_weights / standard_weights.sum()
+    selected_weights = np.array([entry["weight"] for entry in weight_entries], dtype=float)
+    selected_weights = selected_weights / selected_weights.sum()
 
-    print_progress("Running standard fuzzy TOPSIS")
-    standard_closeness, fpis, fnis = perform_fuzzy_topsis(
-        normalised_matrix, standard_weights, device=device
+    print_progress(f"Running fuzzy TOPSIS with '{weight_key}' weights")
+    closeness, fpis, fnis = perform_fuzzy_topsis(
+        normalised_matrix, selected_weights, device=device
     )
-    standard_rankings = rank_results(standard_closeness, suppliers, commodities)
+    rankings = rank_results(closeness, suppliers, commodities)
 
-    ga_weight_entries = weights_data.get("ga_optimised", {}).get("weights", [])
-    if ga_weight_entries:
-        ga_weights = np.array(
-            [entry["weight"] for entry in ga_weight_entries], dtype=float
-        )
-        ga_weights = ga_weights / ga_weights.sum()
-        print_progress("Running GA-weighted fuzzy TOPSIS (weights supplied by AHP)")
-        ga_closeness, _, _ = perform_fuzzy_topsis(
-            normalised_matrix, ga_weights, device=device
-        )
-        ga_rankings = rank_results(ga_closeness, suppliers, commodities)
-    else:
-        print_progress("GA weights not provided; reusing standard weights for comparison")
-        ga_weights = standard_weights.copy()
-        ga_closeness = standard_closeness.copy()
-        ga_rankings = standard_rankings
-
-    table = build_pretty_table(standard_rankings, ga_rankings, limit=10)
-    print(table)
-
-    save_rankings_json(standard_rankings, ga_rankings, fpis, fnis, RANKING_OUTPUT_PATH)
+    output_filename = (
+        f"{RANKING_OUTPUT_PATH.stem}_{weight_key}{RANKING_OUTPUT_PATH.suffix}"
+    )
+    save_rankings_json(
+        weight_key,
+        rankings,
+        fpis,
+        fnis,
+        RANKING_OUTPUT_PATH.parent / output_filename,
+    )
 
     sensitivity_results = {}
     if run_sensitivity:
-        print_progress("Running sensitivity analysis on standard weights")
-        sensitivity_results["standard"] = sensitivity_analysis(
+        print_progress(f"Running sensitivity analysis for '{weight_key}' weights")
+        sensitivity_results = sensitivity_analysis(
             normalised_matrix,
-            standard_weights,
+            selected_weights,
             suppliers,
             commodities,
             perturbation=0.1,
+            iterations=100,
             device=device,
         )
-        
-        print_progress("Running sensitivity analysis on GA-supplied weights")
-        sensitivity_results["ga_optimised"] = sensitivity_analysis(
-            normalised_matrix,
-            ga_weights,
-            suppliers,
-            commodities,
-            perturbation=0.1,
-            device=device,
-        )
-        
-        # Print summary
         print_progress(
-            f"Standard weights sensitivity - Mean correlation: "
-            f"{sensitivity_results['standard']['mean_correlation']:.4f}, "
-            f"Mean rank shift: {sensitivity_results['standard']['mean_rank_shift']:.2f}"
-        )
-        print_progress(
-            f"GA weights sensitivity - Mean correlation: "
-            f"{sensitivity_results['ga_optimised']['mean_correlation']:.4f}, "
-            f"Mean rank shift: {sensitivity_results['ga_optimised']['mean_rank_shift']:.2f}"
+            f"'{weight_key}' sensitivity - Mean correlation: "
+            f"{sensitivity_results['mean_correlation']:.4f}, "
+            f"Mean rank shift: {sensitivity_results['mean_rank_shift']:.2f}"
         )
 
     return {
         "features": features,
         "suppliers": suppliers,
         "commodities": commodities,
-        "standard_scores": standard_closeness,
-        "ga_scores": ga_closeness,
-        "standard_rankings": standard_rankings,
-        "ga_rankings": ga_rankings,
-        "weights_used": {
-            "standard": standard_weights,
-            "ga": ga_weights,
-        },
+        "scores": closeness,
+        "rankings": rankings,
+        "weights_used": selected_weights,
+        "weight_key": weight_key,
         "sensitivity_analysis": sensitivity_results,
     }
 

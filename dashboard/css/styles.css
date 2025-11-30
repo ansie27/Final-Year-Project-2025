@@ -170,11 +170,37 @@ header h1 {
   display: flex;
   gap: 24px;
   flex-wrap: wrap;
+  position: relative;
+}
+
+.table-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4c5162;
+}
+
+.table-controls label {
+  font-weight: 600;
+}
+
+.table-controls select {
+  border: 1px solid #dfe3ef;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background-color: #fff;
+  font-size: 13px;
+  color: #1c1f24;
 }
 
 .table-block {
   flex: 1;
   min-width: 260px;
+  margin-top: 32px;
 }
 
 .table-block h2 {

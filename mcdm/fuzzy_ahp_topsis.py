@@ -58,18 +58,30 @@ def main(dataset_path: Path | str | None = None) -> None:
         print_progress("GPU detected - enabling accelerated TOPSIS computations")
     else:
         print_progress("GPU not detected or unavailable; running TOPSIS on CPU")
-    topsis_output = run_fuzzy_topsis(
-        weights_data=ahp_output["weights_payload"],
+    weights_payload = ahp_output["weights_payload"]
+    topsis_standard = run_fuzzy_topsis(
+        weights_data=weights_payload,
         use_gpu=prefer_gpu,
+        weight_key="standard",
     )
+
+    if "ga_optimised" in weights_payload:
+        topsis_ga = run_fuzzy_topsis(
+            weights_data=weights_payload,
+            use_gpu=prefer_gpu,
+            weight_key="ga_optimised",
+        )
+    else:
+        print_progress("GA weights not available; reusing standard TOPSIS results")
+        topsis_ga = topsis_standard
 
     evaluator = FuzzyPipelineEvaluator(
         standard_weights=ahp_output["standard_weights"],
         ga_weights=ahp_output["ga_weights"],
-        standard_scores=topsis_output["standard_scores"],
-        ga_scores=topsis_output["ga_scores"],
-        suppliers=topsis_output["suppliers"],
-        commodities=topsis_output["commodities"],
+        standard_scores=topsis_standard["scores"],
+        ga_scores=topsis_ga["scores"],
+        suppliers=topsis_standard["suppliers"],
+        commodities=topsis_standard["commodities"],
     )
     summary = evaluator.generate_summary()
 

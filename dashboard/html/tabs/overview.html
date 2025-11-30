@@ -8,7 +8,7 @@
 
   <section class="card metrics-column">
     <div class="metric-block" id="global-risk-score-block">
-      <h3>Global Sustainability Risk Score</h3>
+      <h3>Sustainability Risk Score</h3>
       <p class="metric-reading" id="risk-score-value">--</p>
       <small>Composite risk indicator (0-100)</small>
     </div>
@@ -38,6 +38,12 @@
 
 <div class="overview-secondary-grid">
   <section class="card table-pair">
+    <div class="table-controls">
+      <label for="region-filter">Region</label>
+      <select id="region-filter" aria-label="Filter tables by region">
+        <option value="All">All</option>
+      </select>
+    </div>
     <div class="table-block">
       <h2>Top 5 High-Risk Commodities</h2>
       <table>
@@ -90,6 +96,7 @@
         <thead>
           <tr>
             <th>Supplier</th>
+            <th>Country</th>
             <th>Resilience</th>
             <th>Risk Delta</th>
           </tr>
