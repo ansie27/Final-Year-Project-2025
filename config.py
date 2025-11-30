@@ -105,6 +105,8 @@ RISK_COLUMNS = [
 ]
 
 FEATURE_COLUMNS = [
+    'Supplier_Name', # try 
+    'Commodity_Name', # try
     'Year',
     'Month',
     'Country',
