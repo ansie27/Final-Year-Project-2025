@@ -1,8 +1,5 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Dict, Tuple
-
 import numpy as np
 
 SAATY_SCALE_VALUES: Dict[int, Tuple[float, float, float]] = {
@@ -16,7 +13,6 @@ SAATY_SCALE_VALUES: Dict[int, Tuple[float, float, float]] = {
     8: (7.0, 8.0, 9.0),
     9: (8.0, 9.0, 9.0),
 }
-
 
 def _to_tfn(value: float | "TriangularFuzzyNumber") -> "TriangularFuzzyNumber":
     if isinstance(value, TriangularFuzzyNumber):
@@ -78,10 +74,8 @@ class TriangularFuzzyNumber:
         return cls(l, m, u)
 
     # Defuzzification with the centroid method
-    def defuzzify(self, method: str = "centroid") -> float:
-        if method != "centroid":
-            raise ValueError(f"Unsupported defuzzification method: {method}")
-        return float((self.l + self.m + self.u) / 3)
+    def defuzzify(self) -> float:
+        return (self.l + self.m + self.u) / 3.0
 
     # Fuzzy distance
     def distance_to(self, other: float | "TriangularFuzzyNumber", method: str = "vertex") -> float:
@@ -175,34 +169,54 @@ def calculate_consistency_index(comparison_matrix: np.ndarray, weights: np.ndarr
     lambda_max = calculate_lambda_max(matrix, weights)
     return float((lambda_max - n) / (n - 1))
 
-
 def get_random_index(n: int) -> float:
     random_index = {
-        1: 0.0,
-        2: 0.0,
-        3: 0.58,
-        4: 0.9,
-        5: 1.12,
-        6: 1.24,
-        7: 1.32,
-        8: 1.41,
-        9: 1.45,
-        10: 1.49,
+        1: 0.0, 2: 0.0, 3: 0.58, 4: 0.9, 5: 1.12,
+        6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45, 10: 1.49,
+        11: 1.51, 12: 1.48, 13: 1.56, 14: 1.57, 15: 1.59
     }
-    if n not in random_index:
-        raise ValueError("Random index is defined for n between 1 and 10.")
-    return random_index[n]
+    
+    if n < 1:
+        raise ValueError("n must be positive")
+    
+    # Return exact value if available, otherwise use n=11 approximation
+    return random_index.get(n, 1.51)
 
-
+# CR < 0.1 = acceptable
+# CR 0.05 for n=3, CR 0.08 for n=4
 def calculate_consistency_ratio(comparison_matrix: np.ndarray, weights: np.ndarray) -> float:
     matrix = np.asarray(comparison_matrix, dtype=float)
-    ci = calculate_consistency_index(matrix, weights)
     n = matrix.shape[0]
-    ri = get_random_index(n)
-    if ri == 0:
+    
+    # For n < 3, CR is not applicable
+    if n < 3:
         return 0.0
-    return float(ci / ri)
+    
+    ci = calculate_consistency_index(matrix, weights)
 
+    random_index = {
+        1: 0.0, 2: 0.0, 3: 0.58, 4: 0.9, 5: 1.12,
+        6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45, 10: 1.49,
+        11: 1.51, 12: 1.48, 13: 1.56, 14: 1.57, 15: 1.59
+    }
+    
+    ri = random_index.get(n, 1.51)  # Default to n=11
+    
+    if np.isclose(ri, 0.0):
+        return 0.0
+    
+    cr = ci / ri
+    
+    # If CR is poor
+    if cr > 0.10:
+        import warnings
+        warnings.warn(
+            f"Consistency Ratio ({cr:.4f}) exceeds 0.10 threshold. "
+            "Consider revising pairwise comparisons.",
+            UserWarning
+        )
+    
+    return float(cr)
 
 def is_consistent(
     comparison_matrix: np.ndarray,

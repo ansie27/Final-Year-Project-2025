@@ -1,10 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Sequence
-
 import numpy as np
-
 
 def _spearman(a: np.ndarray, b: np.ndarray) -> float:
     if len(a) != len(b) or len(a) == 0:
@@ -15,7 +11,6 @@ def _spearman(a: np.ndarray, b: np.ndarray) -> float:
         return 0.0
     return float(np.corrcoef(rank_a, rank_b)[0, 1])
 
-
 @dataclass
 class EvaluationSummary:
     weight_delta_max: float
@@ -23,7 +18,6 @@ class EvaluationSummary:
     ranking_correlation: float
     score_shift_mean: float
     top_changes: Sequence[str]
-
 
 class FuzzyPipelineEvaluator:
     def __init__(

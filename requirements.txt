@@ -28,6 +28,7 @@ pycountry>=24.5.1
 
 # Configuration and Utilities
 python-dotenv>=1.0.0
+utils>=1.0.0
 
 # Testing (optional, for development)
 pytest>=7.4.0

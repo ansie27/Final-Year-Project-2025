@@ -9,7 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from mcdm.fuzzy_ahp import run_fuzzy_ahp_analysis
 from mcdm.fuzzy_evaluation import FuzzyPipelineEvaluator
 from mcdm.fuzzy_topsis import run_fuzzy_topsis
-from src.utils import ensure_directory, print_progress, print_section_header  # type: ignore[import]
+from src.utils import ensure_directory, print_progress, print_section_header
 
 PIPELINE_REPORT_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_topsis_results.json"
 
@@ -62,7 +62,6 @@ def main() -> None:
         print_progress("No differences detected in top-ranked supplier-commodity pairs")
 
     persist_pipeline_summary(report)
-
 
 if __name__ == "__main__":
     main()

@@ -22,32 +22,25 @@ RANDOM_STATE = 42
 
 IDENTIFIER_COLUMNS = [
     "SC_ID",
-    "Supplier_ID",
     "Supplier_Name",
-    "Commodity_ID",
     "Commodity_Name",
 ]
-
 
 def ensure_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
-
 def print_progress(message: str, **_: object) -> None:
     print(f"[Fuzzy TOPSIS] {message}")
-
 
 def print_section_header(title: str) -> None:
     banner = "=" * len(title)
     print(f"\n{banner}\n{title}\n{banner}")
-
 
 @dataclass
 class RankingResult:
     supplier: str
     commodity: str
     closeness: float
-
 
 def load_weights(path: Path) -> Dict[str, Dict[str, Sequence[Dict[str, float]]]]:
     if not path.exists():
@@ -92,44 +85,72 @@ def encode_features(df: pd.DataFrame, feature_names: Sequence[str]) -> pd.DataFr
             df_copy[col] = df_copy[col].astype(float)
     return df_copy
 
-
 def normalise_matrix(df: pd.DataFrame, feature_names: Sequence[str]) -> np.ndarray:
     values = df[feature_names].to_numpy(dtype=float)
-    min_vals = values.min(axis=0)
-    max_vals = values.max(axis=0)
-    denom = np.where(np.isclose(max_vals - min_vals, 0), 1.0, max_vals - min_vals)
-    print_progress("Matrix normalised", step=3)
-    return (values - min_vals) / denom
 
+    # Perform vector normalisation = x_ij / sqrt(x_ij^2)
+    norms = np.sqrt((values ** 2).sum(axis=0))
+    norms = np.where(np.isclose(norms,0), 1.0, norms)
+    normalised = values / norms
 
-def build_fuzzy_matrix(normalised: np.ndarray, weights: np.ndarray) -> List[List[TriangularFuzzyNumber]]:
+    print_progress("Matrix normalised using vector normalisation", step=3)
+    return normalised
+
+def build_fuzzy_matrix(
+    normalised: np.ndarray, 
+    weights: np.ndarray,
+    is_benefit: Optional[List[bool]] = None # benefit (True), cost (False), None will assume all are benefit criteria
+) -> List[List[TriangularFuzzyNumber]]:
+    if is_benefit is None:
+        is_benefit = [True] * len(weights)
+    
     weight_tfns = [TriangularFuzzyNumber(w, w, w) for w in weights]
     matrix: List[List[TriangularFuzzyNumber]] = []
+    
     for row in normalised:
         fuzzy_row: List[TriangularFuzzyNumber] = []
-        for value, weight_tfn in zip(row, weight_tfns):
+        for value, weight_tfn, is_ben in zip(row, weight_tfns, is_benefit):
+            
+            # For cost criteria, take reciprocal before multiplying by weight
+            if not is_ben and value != 0:
+                value = 1.0 / value
+            
             value_tfn = TriangularFuzzyNumber(value, value, value)
             fuzzy_row.append(value_tfn * weight_tfn)
         matrix.append(fuzzy_row)
+    
     print_progress("Fuzzy decision matrix constructed")
     return matrix
 
-
+# Determine Fuzzy Positive Ideal Solution (FPIS) and Fuzzy Negative Ideal Solution (FNIS)
+# Benefit criteria: FPIS = max, FNIS = min
+# Cost criteria: FNIS = max, FPIS = min
 def determine_ideal_solutions(
-    weighted_matrix: List[List[TriangularFuzzyNumber]]
+    weighted_matrix: List[List[TriangularFuzzyNumber]],
+    is_benefit: Optional[List[bool]] = None
 ) -> Tuple[List[TriangularFuzzyNumber], List[TriangularFuzzyNumber]]:
+
+    if is_benefit is None:
+        is_benefit = [True] * len(weighted_matrix[0])
+    
     transposed = list(zip(*weighted_matrix))
     fpis: List[TriangularFuzzyNumber] = []
     fnis: List[TriangularFuzzyNumber] = []
-    for column in transposed:
+    
+    for column, is_ben in zip(transposed, is_benefit):
         l_values = [tfn.l for tfn in column]
         m_values = [tfn.m for tfn in column]
         u_values = [tfn.u for tfn in column]
-        fpis.append(TriangularFuzzyNumber(max(l_values), max(m_values), max(u_values)))
-        fnis.append(TriangularFuzzyNumber(min(l_values), min(m_values), min(u_values)))
+        
+        if is_ben:  # Benefit criterion
+            fpis.append(TriangularFuzzyNumber(max(l_values), max(m_values), max(u_values)))
+            fnis.append(TriangularFuzzyNumber(min(l_values), min(m_values), min(u_values)))
+        else:  # Cost criterion
+            fpis.append(TriangularFuzzyNumber(min(l_values), min(m_values), min(u_values)))
+            fnis.append(TriangularFuzzyNumber(max(l_values), max(m_values), max(u_values)))
+    
     print_progress("FPIS and FNIS determined")
     return fpis, fnis
-
 
 def calculate_distances(
     weighted_matrix: List[List[TriangularFuzzyNumber]],
@@ -142,6 +163,53 @@ def calculate_distances(
     print_progress(f"Calculated distances for {len(distances)} alternatives")
     return np.asarray(distances, dtype=float)
 
+def sensitivity_analysis(
+    normalised_matrix: np.ndarray,
+    weights: np.ndarray,
+    suppliers: Sequence[str],
+    commodities: Sequence[str],
+    perturbation: float = 0.1,
+    iterations: int = 100,
+) -> Dict[str, Any]:
+    print_progress("Performing sensitivity analysis")
+    original_scores, _, _ = perform_fuzzy_topsis(normalised_matrix, weights)
+    
+    correlations = []
+    rank_shifts = []
+    
+    for i in range(iterations):
+        # Add Gaussian noise to weights
+        noise = np.random.normal(0, perturbation, len(weights))
+        perturbed = weights * (1 + noise)
+        perturbed = np.clip(perturbed, 0.01, 1.0) # Keep them positive
+        perturbed /= perturbed.sum()  # Re-normalise
+        
+        perturbed_scores, _, _ = perform_fuzzy_topsis(normalised_matrix, perturbed)
+        
+        # Calculate correlation
+        corr = spearman_correlation(original_scores, perturbed_scores)
+        correlations.append(corr)
+        
+        # Calculate rank shift (how many positions top-10 items moved)
+        orig_top10 = np.argsort(original_scores)[-10:][::-1]
+        pert_top10 = np.argsort(perturbed_scores)[-10:][::-1]
+        
+        orig_ranks = {idx: rank for rank, idx in enumerate(orig_top10)}
+        pert_ranks = {idx: rank for rank, idx in enumerate(pert_top10)}
+        
+        shifts = [abs(orig_ranks.get(idx, 10) - pert_ranks.get(idx, 10)) 
+                  for idx in set(orig_top10) | set(pert_top10)]
+        rank_shifts.append(np.mean(shifts) if shifts else 0)
+    
+    return {
+        "mean_correlation": float(np.mean(correlations)),
+        "std_correlation": float(np.std(correlations)),
+        "min_correlation": float(np.min(correlations)),
+        "max_correlation": float(np.max(correlations)),
+        "mean_rank_shift": float(np.mean(rank_shifts)),
+        "perturbation_level": perturbation,
+        "iterations": iterations,
+    }
 
 def perform_fuzzy_topsis(
     normalised_matrix: np.ndarray,
@@ -156,13 +224,11 @@ def perform_fuzzy_topsis(
     closeness = d_minus / np.where((d_plus + d_minus) == 0, 1e-12, d_plus + d_minus)
     return closeness, fpis, fnis
 
-
 def rank_results(closeness: np.ndarray, suppliers: Sequence[str], commodities: Sequence[str]) -> List[RankingResult]:
     order = np.argsort(closeness)[::-1]
     return [
         RankingResult(suppliers[idx], commodities[idx], float(closeness[idx])) for idx in order
     ]
-
 
 def spearman_correlation(a: np.ndarray, b: np.ndarray) -> float:
     if len(a) != len(b):
@@ -188,7 +254,6 @@ def spearman_correlation(a: np.ndarray, b: np.ndarray) -> float:
     corr_matrix = np.corrcoef(rank_a, rank_b)
     return float(corr_matrix[0, 1])
 
-
 def ga_optimise_weights(
     normalised_matrix: np.ndarray,
     target_scores: np.ndarray,
@@ -209,10 +274,8 @@ def ga_optimise_weights(
     print_progress("GA optimisation started")
     return optimizer.optimise(seed_weights, fitness)
 
-
 def serialize_tfn(tfn: TriangularFuzzyNumber) -> Tuple[float, float, float]:
     return (tfn.l, tfn.m, tfn.u)
-
 
 def build_pretty_table(
     standard_results: List[RankingResult],
@@ -245,7 +308,6 @@ def build_pretty_table(
             ]
         )
     return table
-
 
 def save_rankings_json(
     standard_results: List[RankingResult],
@@ -285,10 +347,10 @@ def save_rankings_json(
 
     print_progress(f"Saved final ranking to {output_path}")
 
-
 def run_fuzzy_topsis(
     weights_data: Optional[Dict[str, Dict[str, Sequence[Dict[str, float]]]]] = None,
     data_path: Path = DATA_PATH,
+    run_sensitivity: bool = True
 ) -> Dict[str, Any]:
     print_section_header("Fuzzy TOPSIS Analysis")
     print_progress("Loading weights and dataset")
@@ -344,6 +406,38 @@ def run_fuzzy_topsis(
 
     save_rankings_json(standard_rankings, ga_rankings, fpis, fnis, RANKING_OUTPUT_PATH)
 
+    sensitivity_results = {}
+    if run_sensitivity:
+        print_progress("Running sensitivity analysis on standard weights")
+        sensitivity_results["standard"] = sensitivity_analysis(
+            normalised_matrix,
+            standard_weights,
+            suppliers,
+            commodities,
+            perturbation=0.1,
+        )
+        
+        print_progress("Running sensitivity analysis on GA-optimized weights")
+        sensitivity_results["ga_optimised"] = sensitivity_analysis(
+            normalised_matrix,
+            ga_optimised_weights,
+            suppliers,
+            commodities,
+            perturbation=0.1,
+        )
+        
+        # Print summary
+        print_progress(
+            f"Standard weights sensitivity - Mean correlation: "
+            f"{sensitivity_results['standard']['mean_correlation']:.4f}, "
+            f"Mean rank shift: {sensitivity_results['standard']['mean_rank_shift']:.2f}"
+        )
+        print_progress(
+            f"GA weights sensitivity - Mean correlation: "
+            f"{sensitivity_results['ga_optimised']['mean_correlation']:.4f}, "
+            f"Mean rank shift: {sensitivity_results['ga_optimised']['mean_rank_shift']:.2f}"
+        )
+
     return {
         "features": features,
         "suppliers": suppliers,
@@ -357,13 +451,11 @@ def run_fuzzy_topsis(
             "ga_seed": ga_seed_weights,
             "ga_optimised": ga_optimised_weights,
         },
+        sensitivity_analysis: sensitivity_results
     }
-
 
 def main() -> None:
     run_fuzzy_topsis()
 
-
 if __name__ == "__main__":
     main()
-
