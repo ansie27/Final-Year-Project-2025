@@ -2,7 +2,7 @@
   <div class="filter-bar">
     <div class="filter-copy">
       <h2>Supplier Risk Profile</h2>
-      <p>Insights derived from engineered_supplier_commodity_features.csv</p>
+      <p>Learn more about your suppliers' sustainability risks and performance.</p>
     </div>
     <div class="search-box">
       <label class="sr-only" for="supplier-search">Search supplier</label>
@@ -12,65 +12,61 @@
         placeholder="Search supplier (e.g., KLABIN S.A.)"
         aria-label="Search supplier"
       />
-      <button type="button">Search</button>
+      <button id="supplier-search-btn" type="button">Search</button>
     </div>
   </div>
 
   <section class="card credentials-card">
     <div>
-      <p class="credentials-label">Supplier</p>
-      <h3 class="credentials-name">KLABIN S.A.</h3>
-      <p class="credentials-meta">
+      <p class="credentials-label">SC_ID <span id="supplier-id">SC0000006</span></p>
+      <h3 id="supplier-name" class="credentials-name">KLABIN S.A.</h3>
+      <p id="supplier-meta" class="credentials-meta">
         Industrial Manufacturing &amp; Construction · Tier 1 · 20,275 employees
       </p>
     </div>
     <div class="credentials-meta-list">
       <div>
         <span class="meta-label">HQ</span>
-        <span>São Paulo, Brazil</span>
+        <span id="supplier-hq">São Paulo, Brazil</span>
       </div>
       <div>
         <span class="meta-label">Primary Commodity</span>
-        <span>Paperboard, kraft paper, packaging</span>
+        <span id="supplier-commodity">Paperboard, kraft paper, packaging</span>
       </div>
       <div>
         <span class="meta-label">Certifications</span>
-        <span>FSC · RSPO · ISO 9001</span>
+        <span id="supplier-certifications">FSC · RSPO · ISO 9001</span>
       </div>
     </div>
   </section>
 
   <div class="profile-grid">
     <section class="card risk-summary-card">
-      <h2>Supplier Risk Summary</h2>
+      <h2>Sustainability Risk Summary</h2>
       <div class="risk-summary-content">
         <div class="risk-gauge">
           <div class="risk-gauge-ring">
-            <span>78</span>
+            <span id="supplier-risk-index">78</span>
           </div>
           <p>Overall Risk Index</p>
         </div>
         <div class="risk-details">
           <div>
             <p class="risk-rating-label">Classification</p>
-            <h3 class="risk-rating-value">Medium</h3>
+            <h3 id="supplier-classification" class="risk-rating-value">Medium</h3>
           </div>
           <div class="risk-metrics">
-            <div><span>ESG Score</span><strong>65</strong></div>
-            <div><span>Compliance Level</span><strong>80</strong></div>
-            <div><span>Financial Stability</span><strong>70</strong></div>
-            <div><span>Resilience Score</span><strong>75</strong></div>
+            <div><span>ESG Score</span><strong id="supplier-esg-score">65</strong></div>
+            <div>
+              <span>Compliance Level</span><strong id="supplier-compliance">80</strong>
+            </div>
+            <div>
+              <span>Financial Stability</span><strong id="supplier-financial">70</strong>
+            </div>
+            <div><span>Resilience Score</span><strong id="supplier-resilience">75</strong></div>
           </div>
         </div>
       </div>
-    </section>
-
-    <section class="card risk-trend-card">
-      <div class="card-header">
-        <h2>Risk Trend + Forecast</h2>
-        <p class="card-subtext">Quarterly scores with 2026 outlook</p>
-      </div>
-      <div id="detailed-risk-trend" class="line-chart" aria-label="Risk trend forecast chart"></div>
     </section>
 
     <section class="card esg-breakdown-card">
@@ -84,9 +80,22 @@
     <section class="card reliability-card">
       <h2>Operational Reliability</h2>
       <ul>
-        <li><span>On-Time Delivery</span><strong>95%</strong></li>
-        <li><span>Defect Rate</span><strong>2%</strong></li>
-        <li><span>Lead Time Capacity Ratio</span><strong>0.30</strong></li>
-        <li><span>Operational Index</span><strong>0.95</strong></li>
+        <li><span>On-Time Delivery</span><strong id="reliability-on-time">95%</strong></li>
+        <li><span>Defect Rate</span><strong id="reliability-defect">2%</strong></li>
+        <li>
+          <span>Lead Time Capacity Ratio</span><strong id="reliability-lead-time">0.30</strong>
+        </li>
+        <li><span>Operational Index</span><strong id="reliability-index">0.95</strong></li>
       </ul>
     </section>
+  </div>
+
+  <section class="card risk-trend-card">
+    <div class="card-header">
+      <h2>Risk Trend + Forecast</h2>
+      <p class="card-subtext">Quarterly scores with 2026 outlook</p>
+    </div>
+    <div id="detailed-risk-trend" class="line-chart" aria-label="Risk trend forecast chart"></div>
+  </section>
+</div>
+
