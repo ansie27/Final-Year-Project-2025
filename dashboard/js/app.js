@@ -6,6 +6,8 @@ let mapInitialized = false;
 let mapContainer;
 let resetButton;
 let regionFilter;
+let detailedSearchInput;
+let detailedSearchButton;
 
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabContent = document.getElementById("tab-content");
@@ -36,7 +38,7 @@ async function loadTabContent(tabId) {
   if (tabId === "overview") {
     initOverviewTab();
   } else if (tabId === "detailed") {
-    // Future: initialize detailed view
+    initDetailedTab();
   } else if (tabId === "metrics") {
     // Future: initialize metrics view
   }
@@ -118,6 +120,15 @@ async function fetchCarbonTrajectory() {
 
 async function fetchTrendData() {
   const response = await fetch("/api/trend-data");
+  return response.json();
+}
+
+async function fetchSupplierProfile(query = "") {
+  const qs = query ? `?supplier=${encodeURIComponent(query)}` : "";
+  const response = await fetch(`/api/supplier-profile${qs}`);
+  if (!response.ok) {
+    throw new Error("Supplier not found");
+  }
   return response.json();
 }
 
@@ -234,6 +245,43 @@ function destroyMapListeners() {
 async function resetMap() {
   currentRegion = null;
   await Promise.all([renderMap(), updateOverviewSummary(getSelectedRegion())]);
+}
+
+async function initDetailedTab() {
+  detailedSearchInput = document.getElementById("supplier-search");
+  detailedSearchButton = document.getElementById("supplier-search-btn");
+
+  const handleSearch = async () => {
+    const value = detailedSearchInput?.value?.trim();
+    await loadSupplierProfile(value || "");
+  };
+
+  if (detailedSearchButton) {
+    detailedSearchButton.addEventListener("click", handleSearch);
+  }
+  if (detailedSearchInput) {
+    detailedSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        handleSearch();
+      }
+    });
+  }
+
+  await loadSupplierProfile();
+}
+
+async function loadSupplierProfile(query = "") {
+  try {
+    const profile = await fetchSupplierProfile(query);
+    populateSupplierProfile(profile);
+    renderDetailedRiskTrend(profile.risk_trend);
+    renderEsgBreakdown(profile.esg_breakdown);
+    renderReliability(profile.reliability);
+    renderRiskDrivers(profile.risk_drivers);
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function populateRegionFilter() {
@@ -537,6 +585,132 @@ async function renderTrendChart() {
 
   Plotly.react(node, traces, layout, config);
 }
+
+function populateSupplierProfile(profile) {
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? "--";
+  };
+
+  setText("supplier-name", profile.supplier ?? "--");
+  setText("supplier-id", profile.sc_id ?? "--");
+  setText(
+    "supplier-meta",
+    `${profile.industry || "Industry"} · ${profile.tier || "Tier"} · ${
+      profile.employees?.toLocaleString?.() || "--"
+    } employees`
+  );
+  setText("supplier-hq", profile.country ?? "--");
+  setText("supplier-commodity", profile.commodity ?? "--");
+  setText("supplier-certifications", profile.certifications || "None");
+
+  setText("supplier-risk-index", profile.risk_index ?? "--");
+  setText("supplier-classification", profile.classification ?? "--");
+  setText("supplier-esg-score", profile.metrics.esg_score ?? "--");
+  setText("supplier-compliance", profile.metrics.compliance ?? "--");
+  setText("supplier-financial", profile.metrics.financial ?? "--");
+  setText("supplier-resilience", profile.metrics.resilience ?? "--");
+}
+
+function renderDetailedRiskTrend(trend) {
+  const node = document.getElementById("detailed-risk-trend");
+  if (!node || !trend) return;
+
+  const traces = [];
+  if (trend.actual?.x?.length) {
+    traces.push({
+      x: trend.actual.x,
+      y: trend.actual.y,
+      mode: "lines+markers",
+      name: "Actual",
+      line: { color: "#1f77b4", width: 3 },
+    });
+  }
+  if (trend.forecast?.x?.length) {
+    const startValue =
+      trend.actual?.y?.[trend.actual.y.length - 1] ?? trend.forecast.y[0];
+    const forecastX = [trend.actual?.x?.slice(-1)[0], ...trend.forecast.x];
+    const forecastY = [startValue, ...trend.forecast.y];
+    traces.push({
+      x: forecastX,
+      y: forecastY,
+      mode: "lines",
+      name: "Forecast",
+      line: { color: "#1f77b4", width: 3, dash: "dot" },
+    });
+  }
+
+  const layout = {
+    margin: { t: 10, r: 10, b: 30, l: 40 },
+    xaxis: { gridcolor: "#edf1fa" },
+    yaxis: { range: [0, 100], gridcolor: "#edf1fa" },
+    showlegend: true,
+  };
+
+  Plotly.react(node, traces, layout, { displayModeBar: false, responsive: true });
+}
+
+function renderEsgBreakdown(data) {
+  const node = document.getElementById("esg-breakdown-chart");
+  if (!node || !data) return;
+
+  const labels = ["Environmental", "Social", "Governance"];
+  const values = [
+    data.environmental ?? 0,
+    data.social ?? 0,
+    data.governance ?? 0,
+  ];
+
+  const trace = {
+    x: labels,
+    y: values,
+    type: "bar",
+    marker: { color: ["#2ca02c", "#ff7f0e", "#9467bd"] },
+  };
+
+  const layout = {
+    margin: { t: 10, r: 10, b: 40, l: 40 },
+    yaxis: { range: [0, 100], gridcolor: "#edf1fa" },
+  };
+
+  Plotly.react(node, [trace], layout, { displayModeBar: false, responsive: true });
+}
+
+function renderReliability(data) {
+  if (!data) return;
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? "--";
+  };
+  setText("reliability-on-time", data.on_time);
+  setText("reliability-defect", data.defect_rate);
+  setText("reliability-lead-time", data.lead_time);
+  setText("reliability-index", data.operational_index);
+}
+
+function renderRiskDrivers(drivers) {
+  const node = document.getElementById("risk-drivers-chart");
+  if (!node || !drivers || !drivers.length) return;
+
+  const sorted = drivers.sort((a, b) => b.value - a.value);
+  const data = [
+    {
+      x: sorted.map((d) => d.value),
+      y: sorted.map((d) => d.label),
+      type: "bar",
+      orientation: "h",
+      marker: { color: "#1f4e79" },
+    },
+  ];
+
+  const layout = {
+    margin: { t: 10, r: 10, b: 30, l: 80 },
+    xaxis: { gridcolor: "#edf1fa" },
+  };
+
+  Plotly.react(node, data, layout, { displayModeBar: false, responsive: true });
+}
+
 
 function attachOverviewHandlers() {
   destroyMapListeners();
