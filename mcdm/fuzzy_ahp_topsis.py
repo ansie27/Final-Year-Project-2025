@@ -2,6 +2,11 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    import torch
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -13,6 +18,10 @@ from mcdm.fuzzy_topsis import run_fuzzy_topsis
 
 PIPELINE_REPORT_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_topsis_results.json"
 DEFAULT_DATASET_PATH = Path(config.ENGINEERED_DATA_PATH)
+
+
+def _gpu_is_available() -> bool:
+    return torch is not None and torch.cuda.is_available()
 
 def ensure_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
@@ -44,7 +53,15 @@ def main(dataset_path: Path | str | None = None) -> None:
     print_section_header("Running Fuzzy AHP-TOPSIS pipeline")
     print_progress(f"Using dataset at {resolved_dataset}")
     ahp_output = run_fuzzy_ahp_analysis(dataset_path=resolved_dataset)
-    topsis_output = run_fuzzy_topsis(weights_data=ahp_output["weights_payload"])
+    prefer_gpu = _gpu_is_available()
+    if prefer_gpu:
+        print_progress("GPU detected - enabling accelerated TOPSIS computations")
+    else:
+        print_progress("GPU not detected or unavailable; running TOPSIS on CPU")
+    topsis_output = run_fuzzy_topsis(
+        weights_data=ahp_output["weights_payload"],
+        use_gpu=prefer_gpu,
+    )
 
     evaluator = FuzzyPipelineEvaluator(
         standard_weights=ahp_output["standard_weights"],

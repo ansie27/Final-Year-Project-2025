@@ -56,16 +56,8 @@ header h1 {
   color: #1f4e79;
 }
 
-.tab-panels {
+.tab-content {
   margin-top: 24px;
-}
-
-.tab-panel {
-  display: none;
-}
-
-.tab-panel.active {
-  display: block;
 }
 
 .overview-grid {
@@ -134,10 +126,23 @@ header h1 {
   justify-content: space-between;
 }
 
+.metric-block h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5c606c;
+}
+
 .metric-reading {
   font-size: 40px;
   font-weight: 600;
   margin: 8px 0;
+  color: #1c1f24;
+}
+
+.metric-block small {
+  color: #7a7d85;
+  font-size: 12px;
 }
 
 .donut-block {
@@ -172,6 +177,12 @@ header h1 {
   min-width: 260px;
 }
 
+.table-block h2 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .table-block table {
   width: 100%;
   border-collapse: collapse;
@@ -191,6 +202,7 @@ header h1 {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #7a7d85;
+  font-weight: 600;
 }
 
 .compliance-metric {
@@ -206,6 +218,13 @@ header h1 {
   flex-direction: column;
   gap: 12px;
   align-items: center;
+}
+
+.forecast-card h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  align-self: flex-start;
 }
 
 .forecast-legend {
@@ -226,9 +245,11 @@ header h1 {
 .legend-dot.high {
   background-color: #fa7066;
 }
+
 .legend-dot.medium {
   background-color: #fcaf56;
 }
+
 .legend-dot.low {
   background-color: #adcf7a;
 }
@@ -237,9 +258,82 @@ header h1 {
   min-height: 320px;
 }
 
+.trends-card h2 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .line-chart {
   width: 100%;
   height: 280px;
+}
+
+.content-detailed {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.detail-card {
+  min-height: 200px;
+}
+
+.detail-card h2 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.detail-card ul {
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.detail-card li {
+  margin-bottom: 8px;
+  color: #5c606c;
+}
+
+.metrics-card {
+  min-height: 300px;
+}
+
+.metrics-card h2 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid #eef1fb;
+  border-radius: 12px;
+  background-color: #f9fbff;
+}
+
+.metric-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7a7d85;
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1c1f24;
 }
 
 @media (max-width: 1024px) {
@@ -251,5 +345,8 @@ header h1 {
   .metrics-column {
     min-height: auto;
   }
-}
 
+  .page-container {
+    padding: 20px 30px 40px;
+  }
+}
