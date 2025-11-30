@@ -3,6 +3,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+try:
+    import torch
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None
 import numpy as np
 import pandas as pd
 from prettytable import PrettyTable
@@ -12,19 +17,24 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
-from mcdm.genetic_algorithm import GAParameters, WeightGAOptimizer
 from utils.fuzzy_operations import TriangularFuzzyNumber, vertex_distance
 
 DATA_PATH = Path(config.ENGINEERED_DATA_PATH)
 WEIGHTS_PATH = PROJECT_ROOT / "outputs" / "fuzzy_ahp_weights.json"
 RANKING_OUTPUT_PATH = PROJECT_ROOT / "data" / "ranked" / "final_supplier_commodity_ranking.json"
-RANDOM_STATE = 42
-
 IDENTIFIER_COLUMNS = [
     "SC_ID",
     "Supplier_Name",
     "Commodity_Name",
 ]
+
+
+def _resolve_device(prefer_gpu: bool) -> Optional["torch.device"]:
+    if not prefer_gpu or torch is None:
+        return None
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return None
 
 def ensure_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
@@ -84,16 +94,30 @@ def encode_features(df: pd.DataFrame, feature_names: Sequence[str]) -> pd.DataFr
             df_copy[col] = df_copy[col].astype(float)
     return df_copy
 
-def normalise_matrix(df: pd.DataFrame, feature_names: Sequence[str]) -> np.ndarray:
-    values = df[feature_names].to_numpy(dtype=float)
+def normalise_matrix(
+    df: pd.DataFrame,
+    feature_names: Sequence[str],
+    device: Optional["torch.device"] = None,
+) -> np.ndarray:
+    values = df[feature_names].to_numpy(dtype=np.float32)
 
-    # Perform vector normalisation = x_ij / sqrt(x_ij^2)
-    norms = np.sqrt((values ** 2).sum(axis=0))
-    norms = np.where(np.isclose(norms,0), 1.0, norms)
-    normalised = values / norms
+    if device is not None:
+        tensor = torch.as_tensor(values, device=device)
+        norms = torch.linalg.norm(tensor, dim=0)
+        norms = torch.where(norms == 0, torch.ones_like(norms), norms)
+        normalised = tensor / norms
+        result = normalised.cpu().numpy()
+    else:
+        norms = np.linalg.norm(values, axis=0)
+        norms = np.where(np.isclose(norms, 0), 1.0, norms)
+        result = values / norms
 
-    print_progress("Matrix normalised using vector normalisation", step=3)
-    return normalised
+    print_progress(
+        "Matrix normalised using vector normalisation"
+        + (" (GPU)" if device is not None else ""),
+        step=3,
+    )
+    return result
 
 def build_fuzzy_matrix(
     normalised: np.ndarray, 
@@ -169,9 +193,12 @@ def sensitivity_analysis(
     commodities: Sequence[str],
     perturbation: float = 0.1,
     iterations: int = 100,
+    device: Optional["torch.device"] = None,
 ) -> Dict[str, Any]:
     print_progress("Performing sensitivity analysis")
-    original_scores, _, _ = perform_fuzzy_topsis(normalised_matrix, weights)
+    original_scores, _, _ = perform_fuzzy_topsis(
+        normalised_matrix, weights, device=device
+    )
     
     correlations = []
     rank_shifts = []
@@ -183,7 +210,9 @@ def sensitivity_analysis(
         perturbed = np.clip(perturbed, 0.01, 1.0) # Keep them positive
         perturbed /= perturbed.sum()  # Re-normalise
         
-        perturbed_scores, _, _ = perform_fuzzy_topsis(normalised_matrix, perturbed)
+        perturbed_scores, _, _ = perform_fuzzy_topsis(
+            normalised_matrix, perturbed, device=device
+        )
         
         # Calculate correlation
         corr = spearman_correlation(original_scores, perturbed_scores)
@@ -210,9 +239,30 @@ def sensitivity_analysis(
         "iterations": iterations,
     }
 
+def _compute_closeness(
+    d_plus: np.ndarray,
+    d_minus: np.ndarray,
+    device: Optional["torch.device"] = None,
+) -> np.ndarray:
+    if device is not None:
+        d_plus_t = torch.as_tensor(d_plus, device=device, dtype=torch.float32)
+        d_minus_t = torch.as_tensor(d_minus, device=device, dtype=torch.float32)
+        denom = torch.where(
+            (d_plus_t + d_minus_t) == 0,
+            torch.full_like(d_plus_t, 1e-12),
+            d_plus_t + d_minus_t,
+        )
+        closeness = (d_minus_t / denom).cpu().numpy()
+        return closeness.astype(float)
+
+    denom = np.where((d_plus + d_minus) == 0, 1e-12, d_plus + d_minus)
+    return (d_minus / denom).astype(float)
+
+
 def perform_fuzzy_topsis(
     normalised_matrix: np.ndarray,
     weights: np.ndarray,
+    device: Optional["torch.device"] = None,
 ) -> Tuple[np.ndarray, List[TriangularFuzzyNumber], List[TriangularFuzzyNumber]]:
     print_progress("Building weighted matrix")
     weighted_matrix = build_fuzzy_matrix(normalised_matrix, weights)
@@ -220,7 +270,7 @@ def perform_fuzzy_topsis(
     d_plus = calculate_distances(weighted_matrix, fpis)
     d_minus = calculate_distances(weighted_matrix, fnis)
     print_progress("Computed closeness coefficients")
-    closeness = d_minus / np.where((d_plus + d_minus) == 0, 1e-12, d_plus + d_minus)
+    closeness = _compute_closeness(d_plus, d_minus, device=device)
     return closeness, fpis, fnis
 
 def rank_results(closeness: np.ndarray, suppliers: Sequence[str], commodities: Sequence[str]) -> List[RankingResult]:
@@ -252,26 +302,6 @@ def spearman_correlation(a: np.ndarray, b: np.ndarray) -> float:
         return 0.0
     corr_matrix = np.corrcoef(rank_a, rank_b)
     return float(corr_matrix[0, 1])
-
-def ga_optimise_weights(
-    normalised_matrix: np.ndarray,
-    target_scores: np.ndarray,
-    seed_weights: np.ndarray,
-    random_state: int = RANDOM_STATE,
-) -> np.ndarray:
-    params = GAParameters(random_state=random_state, generations=40)
-    optimizer = WeightGAOptimizer(params)
-
-    def fitness(candidate: np.ndarray) -> float:
-        candidate = candidate / candidate.sum()
-        scores, _, _ = perform_fuzzy_topsis(normalised_matrix, candidate)
-        correlation = spearman_correlation(scores, target_scores)
-        if np.isnan(correlation):
-            correlation = -1.0
-        return -correlation  # minimise negative correlation (maximise stability)
-
-    print_progress("GA optimisation started")
-    return optimizer.optimise(seed_weights, fitness)
 
 def serialize_tfn(tfn: TriangularFuzzyNumber) -> Tuple[float, float, float]:
     return (tfn.l, tfn.m, tfn.u)
@@ -349,7 +379,8 @@ def save_rankings_json(
 def run_fuzzy_topsis(
     weights_data: Optional[Dict[str, Dict[str, Sequence[Dict[str, float]]]]] = None,
     data_path: Path = DATA_PATH,
-    run_sensitivity: bool = True
+    run_sensitivity: bool = True,
+    use_gpu: bool = False,
 ) -> Dict[str, Any]:
     print_section_header("Fuzzy TOPSIS Analysis")
     print_progress("Loading weights and dataset")
@@ -360,9 +391,15 @@ def run_fuzzy_topsis(
     required_columns = features + IDENTIFIER_COLUMNS
     df = load_dataset(data_path, required_columns)
 
+    device = _resolve_device(use_gpu)
+    if device is not None:
+        print_progress(f"GPU detected - using {device} for accelerated steps")
+    else:
+        print_progress("GPU not available or disabled; running on CPU")
+
     prepared_df = fill_missing_values(df, features)
     encoded_df = encode_features(prepared_df, features)
-    normalised_matrix = normalise_matrix(encoded_df, features)
+    normalised_matrix = normalise_matrix(encoded_df, features, device=device)
 
     supplier_series = (
         df["Supplier_Name"]
@@ -382,23 +419,27 @@ def run_fuzzy_topsis(
     standard_weights = standard_weights / standard_weights.sum()
 
     print_progress("Running standard fuzzy TOPSIS")
-    standard_closeness, fpis, fnis = perform_fuzzy_topsis(normalised_matrix, standard_weights)
+    standard_closeness, fpis, fnis = perform_fuzzy_topsis(
+        normalised_matrix, standard_weights, device=device
+    )
     standard_rankings = rank_results(standard_closeness, suppliers, commodities)
 
-    ga_weight_entries = weights_data["ga_optimised"]["weights"]
-    ga_seed_weights = np.array([entry["weight"] for entry in ga_weight_entries], dtype=float)
-    ga_seed_weights = ga_seed_weights / ga_seed_weights.sum()
-    ga_target_scores, _, _ = perform_fuzzy_topsis(normalised_matrix, ga_seed_weights)
-
-    print_progress("Optimising weights for GA fuzzy TOPSIS")
-    ga_optimised_weights = ga_optimise_weights(
-        normalised_matrix,
-        ga_target_scores,
-        seed_weights=ga_seed_weights,
-        random_state=RANDOM_STATE,
-    )
-    ga_closeness, _, _ = perform_fuzzy_topsis(normalised_matrix, ga_optimised_weights)
-    ga_rankings = rank_results(ga_closeness, suppliers, commodities)
+    ga_weight_entries = weights_data.get("ga_optimised", {}).get("weights", [])
+    if ga_weight_entries:
+        ga_weights = np.array(
+            [entry["weight"] for entry in ga_weight_entries], dtype=float
+        )
+        ga_weights = ga_weights / ga_weights.sum()
+        print_progress("Running GA-weighted fuzzy TOPSIS (weights supplied by AHP)")
+        ga_closeness, _, _ = perform_fuzzy_topsis(
+            normalised_matrix, ga_weights, device=device
+        )
+        ga_rankings = rank_results(ga_closeness, suppliers, commodities)
+    else:
+        print_progress("GA weights not provided; reusing standard weights for comparison")
+        ga_weights = standard_weights.copy()
+        ga_closeness = standard_closeness.copy()
+        ga_rankings = standard_rankings
 
     table = build_pretty_table(standard_rankings, ga_rankings, limit=10)
     print(table)
@@ -414,15 +455,17 @@ def run_fuzzy_topsis(
             suppliers,
             commodities,
             perturbation=0.1,
+            device=device,
         )
         
-        print_progress("Running sensitivity analysis on GA-optimized weights")
+        print_progress("Running sensitivity analysis on GA-supplied weights")
         sensitivity_results["ga_optimised"] = sensitivity_analysis(
             normalised_matrix,
-            ga_optimised_weights,
+            ga_weights,
             suppliers,
             commodities,
             perturbation=0.1,
+            device=device,
         )
         
         # Print summary
@@ -447,10 +490,9 @@ def run_fuzzy_topsis(
         "ga_rankings": ga_rankings,
         "weights_used": {
             "standard": standard_weights,
-            "ga_seed": ga_seed_weights,
-            "ga_optimised": ga_optimised_weights,
+            "ga": ga_weights,
         },
-        sensitivity_analysis: sensitivity_results
+        "sensitivity_analysis": sensitivity_results,
     }
 
 def main() -> None:
